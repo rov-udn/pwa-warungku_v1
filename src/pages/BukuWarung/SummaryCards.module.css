@@ -1,0 +1,185 @@
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.card {
+  background-color: var(--bg-header, #ffffff);
+  border: 1px solid var(--border-light, #eef0f3);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #8e8e93);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.icon {
+  font-size: 1.1rem;
+}
+
+.value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main, #1c1c1e);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: baseline;
+}
+
+.valueGlow {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--glow-blue, #00f5ff);
+  margin-bottom: 2px;
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.25);
+}
+
+.currency {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #8e8e93);
+  margin-right: 2px;
+}
+
+.subtext {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #8e8e93);
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.subtextKategori {
+  font-size: 0.8rem;
+  color: var(--glow-blue, #00f5ff);
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+/* 🌅 Light Mode Specifics */
+.cardModal .value {
+  color: var(--accent-emerald, #0a8168);
+}
+
+/* 🌙 Dark Mode - Cyberpunk Neon & Doff Override */
+:global(body.dark-theme) .card {
+  background-color: #121214; /* Doff arang */
+  border-color: #2a2a2a;
+  box-shadow: none;
+}
+
+:global(body.dark-theme) .cardModal {
+  border-color: rgba(255, 183, 3, 0.25);
+  box-shadow: 0 0 12px rgba(255, 183, 3, 0.05);
+}
+
+:global(body.dark-theme) .cardModal .value {
+  color: #ffb703 !important; /* Neon Yellow/Gold */
+  text-shadow: 0 0 10px rgba(255, 183, 3, 0.45);
+}
+
+:global(body.dark-theme) .cardModal .currency {
+  color: #ffb703;
+  opacity: 0.8;
+}
+
+:global(body.dark-theme) .cardBarang {
+  border-color: rgba(0, 245, 255, 0.25);
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.05);
+}
+
+:global(body.dark-theme) .cardBarang .value {
+  color: #00f5ff !important; /* Neon Blue */
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.45);
+}
+
+:global(body.dark-theme) .cardKategori {
+  border-color: rgba(0, 245, 255, 0.25);
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.05);
+}
+
+:global(body.dark-theme) .cardKategori .valueGlow {
+  color: #00f5ff !important;
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.45);
+}
+
+/* ── 📱 RESPONSIVITAS MOBILE ── */
+@media (max-width: 768px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .card {
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
+    min-height: 70px !important;
+    justify-content: center !important;
+  }
+  
+  .cardHeader {
+    margin-bottom: 4px !important;
+  }
+  
+  .title {
+    font-size: 0.65rem !important;
+    letter-spacing: 0.4px !important;
+  }
+  
+  .icon {
+    font-size: 0.95rem !important;
+  }
+  
+  .value, .valueGlow {
+    font-size: 1.05rem !important;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Kotak Kategori dibuat memanjang penuh 100% di baris bawah dengan gaya doff gelap cyberpunk */
+  .fullWidthMobile {
+    grid-column: span 2 !important; 
+    background-color: #121214 !important; /* Doff arang gelap */
+    border: 1px solid #2a2a2a !important;
+    box-shadow: 0 0 12px rgba(0, 245, 255, 0.08) !important;
+  }
+
+  .fullWidthMobile .title {
+    color: #8e8e93 !important;
+  }
+
+  .fullWidthMobile .valueGlow {
+    color: #00f5ff !important;
+    text-shadow: 0 0 10px rgba(0, 245, 255, 0.5) !important;
+  }
+  
+  .fullWidthMobile .subtextKategori {
+    color: #00f5ff !important;
+    opacity: 0.8;
+  }
+}

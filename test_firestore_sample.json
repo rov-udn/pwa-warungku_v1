@@ -1,0 +1,26 @@
+[
+  {
+    "id": "doc1_djinggo",
+    "barcode": "8993989111008",
+    "catatanHarga": "Not eceran",
+    "catatanUtama": "11.000/Bks",
+    "fotoUrl": "",
+    "hargaAgen": 100000,
+    "kategori": "Rokok/Korek",
+    "nama": "Djinggo lama 12",
+    "satuanBeli": "Slop",
+    "stok": 0
+  },
+  {
+    "id": "doc2_aice",
+    "barcode": "8885013133264",
+    "catatanHarga": "",
+    "catatanUtama": "4.000/Pcs",
+    "fotoUrl": "https://i.postimg.cc/WzwyqphT/IMG-20260320-193242.jpg",
+    "hargaAgen": 4000,
+    "kategori": "Snack/Biskit/Roti",
+    "nama": "Aice mochi mangga",
+    "satuanBeli": "pcs",
+    "stok": 0
+  }
+]

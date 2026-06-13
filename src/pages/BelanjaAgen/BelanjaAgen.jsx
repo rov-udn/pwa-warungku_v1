@@ -1,0 +1,403 @@
+import { useState, useMemo } from 'react';
+import styles from './BelanjaAgen.module.css'; // 👈 Mengunci CSS Module asli bawaan kamu!
+
+function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBelanja }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [kategoriAktif, setKategoriAktif] = useState('Semua'); 
+  const [keranjang, setKeranjang] = useState([]);
+  
+  // ── 📱 SAKLAR NAVIGASI UTAMA (PILIH BARANG / KERANJANG) ──
+  const [tabAktif, setTabAktif] = useState('pilih'); 
+
+  // State untuk Modal Pemilih Kriteria (Satuan, Varian, Qty, Harga)
+  const [modalTerbuka, setModalTerbuka] = useState(false);
+  const [barangTerpilih, setBarangTerpilih] = useState(null);
+  const [satuanTerpilih, setSatuanTerpilih] = useState('');
+  const [varianTerpilih, setVarianTerpilih] = useState(''); 
+  const [qtyInput, setQtyInput] = useState(1);
+  const [inputHargaModal, setInputHargaModal] = useState('');
+
+  const daftarKategori = ['Semua', 'Sembako', 'Rokok', 'Mie Instan', 'Kopi / Minuman', 'Sabun / Sampo', 'Camilan'];
+
+  const dapatkanKategoriBarang = (nama) => {
+    const namaKecil = nama.toLowerCase();
+    if (namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya')) return 'Rokok';
+    if (namaKecil.includes('mie') || namaKecil.includes('indomie') || namaKecil.includes('sedaap') || namaKecil.includes('intermie')) return 'Mie Instan';
+    if (namaKecil.includes('kopi') || namaKecil.includes('kapal api') || namaKecil.includes('teh') || namaKecil.includes('le minerale')) return 'Kopi / Minuman';
+    if (namaKecil.includes('sabun') || namaKecil.includes('sampo') || namaKecil.includes('rinso') || namaKecil.includes('biore')) return 'Sabun / Sampo';
+    if (namaKecil.includes('chiki') || namaKecil.includes('snack') || namaKecil.includes('wafer') || namaKecil.includes('biskuit')) return 'Camilan';
+    return 'Sembako';
+  };
+
+  const barangFiltered = useMemo(() => {
+    return daftarBarang.filter((barang) => {
+      const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
+      const katBarang = dapatkanKategoriBarang(barang.nama);
+      const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
+      return cocokSearch && cocokKategori;
+    });
+  }, [daftarBarang, searchTerm, kategoriAktif]);
+
+  const handleKlikTambah = (barang) => {
+    setBarangTerpilih(barang);
+    setSatuanTerpilih(barang.satuanModal || 'Pcs');
+    setVarianTerpilih(barang.varian && barang.varian.length > 0 ? barang.varian[0] : ''); 
+    setQtyInput(1);
+    setInputHargaModal(barang.modal || 0); 
+    setModalTerbuka(true);
+  };
+
+  const handleSimpanKeKeranjang = () => {
+    if (!barangTerpilih) return;
+
+    const hargaModalFinal = Number(inputHargaModal);
+    
+    if (hargaModalFinal !== barangTerpilih.modal) {
+      onUpdateHargaModal(barangTerpilih.id, hargaModalFinal, satuanTerpilih); // 👈 Sudah disinkronkan dengan penambahan parameter satuanBeliAgen di App.jsx
+    }
+
+    const namaDenganVarian = varianTerpilih ? `${barangTerpilih.nama} (${varianTerpilih})` : barangTerpilih.nama;
+
+    const itemKeranjangBaru = {
+      idUnik: `${barangTerpilih.id}-${satuanTerpilih}-${varianTerpilih}-${Date.now()}`,
+      id: barangTerpilih.id,
+      nama: namaDenganVarian, 
+      qty: Number(qtyInput),
+      satuanModal: satuanTerpilih,
+      modalBaru: hargaModalFinal
+    };
+
+    setKeranjang((prev) => [...prev, itemKeranjangBaru]);
+    setModalTerbuka(false);
+    setBarangTerpilih(null);
+  };
+
+  const handleHapusItemKeranjang = (idUnik) => {
+    setKeranjang((prev) => prev.filter(item => item.idUnik !== idUnik));
+  };
+
+  const handleUbahQtyRow = (idUnik, delta) => {
+    setKeranjang((prev) =>
+      prev.map((item) => {
+        if (item.idUnik === idUnik) {
+          return { ...item, qty: Math.max(1, item.qty + delta) };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleUbahHargaRow = (idUnik, hargaBaru) => {
+    setKeranjang((prev) =>
+      prev.map((item) => {
+        if (item.idUnik === idUnik) {
+          return { ...item, modalBaru: Number(hargaBaru) };
+        }
+        return item;
+      })
+    );
+  };
+
+  const hitungTotalEstimasi = () => {
+    return keranjang.reduce((total, item) => total + (item.qty * item.modalBaru), 0);
+  };
+
+  const handleShareUniversal = () => {
+    if (keranjang.length === 0) return;
+
+    const tgl = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' });
+    const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    let teksNota = `🏪 *WARUNG HAERUDIN*\n`; 
+    teksNota += `📅 ${tgl} | ⏰ ${jam} WIB\n`;
+    teksNota += `--------------------------------\n\n`;
+    teksNota += `*DAFTAR PESANAN KULAKAN:*\n\n`;
+
+    keranjang.forEach((item, index) => {
+      const kat = dapatkanKategoriBarang(item.nama).toUpperCase();
+      teksNota += `${index + 1}. *[${kat}]* ${item.nama}\n`;
+      teksNota += `   👉 Isi: *${item.qty} ${item.satuanModal}*\n\n`;
+    });
+    
+    teksNota += `--------------------------------\n`;
+    teksNota += `_Mohon disiapkan ya Ko/Cik, terima kasih!_ 🙏`;
+
+    if (navigator.share) {
+      navigator.share({ title: 'Pesanan Warung Haerudin', text: teksNota }).catch((err) => console.log(err));
+    } else {
+      navigator.clipboard.writeText(teksNota);
+      alert("📋 Daftar pesanan sudah dicopy ke HP, Fi!");
+    }
+
+    onTambahHistoryBelanja(keranjang);
+    setKeranjang([]);
+    setTabAktif('pilih'); 
+  };
+
+  return (
+    <div className={styles.container}>
+      
+      {/* ── 🕹️ HEADER NAVIGASI TAB ── */}
+      <div className={styles.tabHeader}>
+        <button
+          type="button"
+          onClick={() => setTabAktif('pilih')}
+          className={`${styles.tabBtn} ${tabAktif === 'pilih' ? styles.tabBtnActive : ''}`}
+        >
+          🔍 Pilih Barang
+        </button>
+        <button
+          type="button"
+          onClick={() => setTabAktif('keranjang')}
+          className={`${styles.tabBtn} ${tabAktif === 'keranjang' ? styles.tabBtnActive : ''}`}
+        >
+          🛒 Keranjang Belanja
+          {keranjang.length > 0 && <span className={styles.badgeCount}>{keranjang.length}</span>}
+        </button>
+      </div>
+
+      {/* ── 📦 TAB 1: AREA LIHAT BARANG DAN MASUKIN KERANJANG ── */}
+      {tabAktif === 'pilih' && (
+        <div>
+          <input 
+            type="text"
+            placeholder="🔎 Cari barang kulakan (Indomie, Surya, dll)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={styles.searchBar}
+          />
+
+          {/* Scroll Horizontal Kategori */}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+            {daftarKategori.map((kat) => {
+              const isAktif = kategoriAktif === kat;
+              return (
+                <button
+                  key={kat}
+                  type="button"
+                  onClick={() => setKategoriAktif(kat)}
+                  style={{
+                    padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s ease',
+                    border: isAktif ? '1px solid #0a8168' : '1px solid var(--border-color, #eef0f3)',
+                    backgroundColor: isAktif ? '#0a8168' : 'var(--bg-header, #ffffff)',
+                    color: isAktif ? '#ffffff' : 'var(--text-muted, #8e8e93)',
+                    fontWeight: isAktif ? '700' : '500'
+                  }}
+                >
+                  {kat}
+                </button>
+              );
+            })}
+          </div>
+
+          <h3 className={styles.sectionTitle || ''} style={{ fontSize: '0.95rem', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main, #1c1c1e)', textAlign: 'left' }}>
+            Pilih Barang Toko
+          </h3>
+          <div className={styles.gridBarang}>
+            {barangFiltered.length === 0 ? (
+              <div className={styles.textKosong || ''} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, Fi. 🧐</div>
+            ) : (
+              barangFiltered.map((barang) => (
+                <div key={barang.id} onClick={() => handleKlikTambah(barang)} className={styles.cardPilihItem}>
+                  <div className={styles.infoKiri}>
+                    <h4>{barang.nama}</h4>
+                    <span>M: Rp {(barang.modal || 0).toLocaleString('id-ID')} / {barang.satuanModal || 'Pcs'}</span>
+                  </div>
+                  <div className={styles.indicatorPilih}>
+                    + Keranjang
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── 🛒 TAB 2: MENU AREA LIST KERANJANG BELANJA TERPISAH ── */}
+      {(tabAktif === 'get_keranjang' || tabAktif === 'keranjang') && (
+        <div>
+          {keranjang.length === 0 ? (
+            <div className={styles.textKosong || ''} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '10px' }}>🛒</span>
+              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-main)' }}>Keranjang kulakan kosong, Fi!</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem' }}>Silakan kembali ke tab pilih barang terlebih dahulu.</p>
+            </div>
+          ) : (
+            <>
+              <div>
+                {keranjang.map((item) => (
+                  <div key={item.idUnik} className={styles.itemBelanja}>
+                    
+                    <div className={styles.infoNama}>
+                      <p className={styles.namaBarang}>{item.nama}</p>
+                    </div>
+
+                    <div className={styles.centerSection}>
+                      <span className={styles.satuanLabel}>{item.satuanModal}</span>
+                      <div className={styles.counterBox}>
+                        <button type="button" onClick={() => handleUbahQtyRow(item.idUnik, -1)} className={styles.btnCount}>-</button>
+                        <input type="number" value={item.qty} readOnly className={styles.qtyInput} />
+                        <button type="button" onClick={() => handleUbahQtyRow(item.idUnik, 1)} className={styles.btnCount}>+</button>
+                      </div>
+                    </div>
+
+                    <div className={styles.rightSection}>
+                      <div className={styles.hargaContainer}>
+                        <input 
+                          type="number" 
+                          value={item.modalBaru} 
+                          onChange={(e) => handleUbahHargaRow(item.idUnik, e.target.value)} 
+                          className={styles.inputHarga} 
+                        />
+                        <div className={styles.totalHargaRow}>
+                          Rp {(item.qty * item.modalBaru).toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button type="button" onClick={() => handleHapusItemKeranjang(item.idUnik)} className={styles.btnHapusRow}>
+                      ❌
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className={styles.estimasiBox}>
+                <div className={styles.rowTotal}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-muted)' }}>Estimasi Total Kulakan:</span>
+                  <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0a8168' }}>
+                    Rp {hitungTotalEstimasi().toLocaleString('id-ID')}
+                  </span>
+                </div>
+                <button type="button" onClick={handleShareUniversal} className={styles.btnSelesai}>
+                  🚀 Kirim Daftar Pesanan ke WA Agen
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 🟢 POP-UP MODAL SELECTION (100% AMAN BEBAS NO-USELESS-ASSIGNMENT) ── */}
+      {modalTerbuka && barangTerpilih && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
+          <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '400px', borderRadius: '14px', padding: '20px', boxSizing: 'border-box', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', color: '#1c1c1e' }}>
+            
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: '800' }}>Kriteria Kulakan</h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: '#555', fontWeight: '600' }}>{barangTerpilih.nama}</p>
+
+            {/* A. Pilihan Varian */}
+            {barangTerpilih.varian && barangTerpilih.varian.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Pilih Varian Rasa / Jenis:</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {barangTerpilih.varian.map((v) => {
+                    const isVarianAktif = varianTerpilih === v;
+                    return (
+                      <button 
+                        key={v} 
+                        type="button" 
+                        onClick={() => setVarianTerpilih(v)} 
+                        style={{ padding: '6px 12px', borderRadius: '6px', border: isVarianAktif ? '1px solid #0a8168' : '1px solid #ced4da', backgroundColor: isVarianAktif ? 'rgba(10,129,104,0.1)' : '#fff', color: isVarianAktif ? '#0a8168' : '#333', fontWeight: isVarianAktif ? '700' : '500', fontSize: '0.8rem', cursor: 'pointer' }}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* B. Pemilih Satuan Otomatis (AMPUTASI TOTAL LET-VARIABLE MUBASIR) */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Pilih Satuan Beli Agen:</label>
+              {(() => {
+                const options = [];
+                
+                // 1. Eceran
+                options.push({
+                  type: 'eceran',
+                  label: barangTerpilih.satuanModal || 'Pcs',
+                  calculate: () => barangTerpilih.modal || 0
+                });
+
+                // 2. Grosir Menengah
+                if (barangTerpilih.bisaGrosir) {
+                  options.push({
+                    type: 'grosir',
+                    label: barangTerpilih.satuanGrosirNama || 'Renteng',
+                    calculate: () => {
+                      const isiRenteng = Number(barangTerpilih.minimalBeliGrosir) || 10;
+                      return barangTerpilih.jualGrosir ? (barangTerpilih.jualGrosir * isiRenteng) : (barangTerpilih.modal * isiRenteng);
+                    }
+                  });
+                }
+
+                // 3. Grosir Besar
+                if (barangTerpilih.bisaGrosirBesar) {
+                  options.push({
+                    type: 'grosirBesar',
+                    label: barangTerpilih.satuanGrosirBesarNama || 'Dus',
+                    calculate: () => barangTerpilih.jualGrosirBesarTotal || (barangTerpilih.modal * (barangTerpilih.minimalBeliGrosirBesar || 40))
+                  });
+                }
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: '6px' }}>
+                    {options.map((opt) => {
+                      const dipilih = satuanTerpilih === opt.label;
+                      return (
+                        <button
+                          key={opt.type}
+                          type="button"
+                          onClick={() => {
+                            setSatuanTerpilih(opt.label);
+                            setInputHargaModal(opt.calculate());
+                          }}
+                          style={{ padding: '8px 4px', borderRadius: '6px', border: dipilih ? '1px solid #0a8168' : '1px solid #ced4da', backgroundColor: dipilih ? 'rgba(10,129,104,0.1)' : '#fff', color: dipilih ? '#0a8168' : '#333', fontWeight: dipilih ? '700' : '500', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* C. Qty Input */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Jumlah Kulakan:</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button type="button" onClick={() => setQtyInput(prev => Math.max(1, prev - 1))} style={{ width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #ced4da', background: '#f8f9fa', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer' }}>-</button>
+                <input type="number" value={qtyInput} onChange={(e) => setQtyInput(Math.max(1, Number(e.target.value)))} style={{ flexGrow: 1, height: '36px', border: '1px solid #ced4da', borderRadius: '6px', fontSize: '1rem', fontWeight: '700', textAlign: 'center', outline: 'none', background: '#fff', color: '#111' }} />
+                <button type="button" onClick={() => setQtyInput(prev => prev + 1)} style={{ width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #ced4da', background: '#f8f9fa', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer' }}>+</button>
+              </div>
+            </div>
+
+            {/* D. Harga Modal Input */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Harga Modal Agen (Bisa Di-edit):</label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '10px', color: '#666', fontSize: '0.9rem', fontWeight: '600' }}>Rp</span>
+                <input type="number" value={inputHargaModal} onChange={(e) => setInputHargaModal(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '6px', border: '1px solid #ced4da', fontSize: '1rem', fontWeight: '700', boxSizing: 'border-box', outline: 'none', backgroundColor: '#f2f2f7', color: Number(inputHargaModal) !== barangTerpilih.modal ? '#d9480f' : '#222' }} />
+              </div>
+              {Number(inputHargaModal) !== barangTerpilih.modal && (
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#d9480f', fontWeight: '600', textAlign: 'left' }}>⚠️ Harga berubah! Otomatis update harga modal di gudang.</p>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" onClick={() => setModalTerbuka(false)} style={{ flex: 1, padding: '10px', background: '#f1f3f5', border: 'none', borderRadius: '8px', fontWeight: '700', color: '#495057', cursor: 'pointer' }}>Batal</button>
+              <button type="button" onClick={handleSimpanKeKeranjang} style={{ flex: 1, padding: '10px', background: '#0a8168', border: 'none', borderRadius: '8px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Simpan</button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+export default BelanjaAgen;

@@ -1,0 +1,258 @@
+.container {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 4px;
+}
+
+.headerArea {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.mainTitle {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-main, #1c1c1e);
+}
+
+.subHeader {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted, #8e8e93);
+}
+
+/* 📊 BARIS PENCARIAN & TOMBOL */
+.searchRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px; /* Dikecilkan sedikit agar jarak ke kategori pas */
+  width: 100%;
+}
+
+.searchBar {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #eef0f3);
+  background-color: var(--bg-header, #ffffff);
+  color: var(--text-main, #1c1c1e);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.btnTambah {
+  padding: 0 16px;
+  background-color: #0a8168;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btnImport {
+  padding: 0 16px;
+  background-color: #2196F3;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* 🟢 SCROLL HORIZONTAL KATEGORI MATTE-GLOW (TAMBAHAN SAKTI) */
+.scrollKategori {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+  scrollbar-width: none; /* Sembunyikan scrollbar di Firefox */
+}
+
+.scrollKategori::-webkit-scrollbar {
+  display: none; /* Sembunyikan scrollbar di Chrome, Safari, dan HP */
+}
+
+.btnKategoriPill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color, #eef0f3);
+  background-color: var(--bg-toggle, #f2f2f7);
+  color: var(--text-muted, #495057);
+  font-weight: 500;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnKategoriActive {
+  border: 1px solid #0a8168;
+  background-color: #0a8168;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* 📦 BADGE TAG KATEGORI DI ATAS NAMA ITEM (TAMBAHAN SAKTI) */
+.badgeKategori {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #0a8168;
+  background-color: rgba(10, 129, 104, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* 📥 MODAL IMPORT OVERLAY & CONTENT */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modalContent {
+  background-color: var(--bg-header, #ffffff);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  color: var(--text-main, #1c1c1e);
+}
+
+/* 📦 DAFTAR KARTU ACCORDION */
+.listContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardItem {
+  background-color: var(--bg-header, #ffffff);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #eef0f3);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.01);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.cardMainInfo {
+  padding-right: 75px;
+}
+
+.barangNama {
+  margin: 0 0 4px 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main, #1c1c1e);
+}
+
+.priceGrid {
+  display: flex;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--text-muted, #8e8e93);
+}
+
+/* 🔽 PANEL LACI DETAIL MEKAR */
+.detailPanel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-color, #eef0f3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: melorot 0.2s ease-out;
+}
+
+.detailRow {
+  font-size: 0.78rem;
+  color: var(--text-main, #1c1c1e);
+}
+
+.detailLabel {
+  font-weight: 700;
+  color: var(--text-muted, #8e8e93);
+}
+
+.badgeContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.badgeVarian {
+  background-color: var(--bg-toggle, #f2f2f7);
+  color: var(--text-main, #1c1c1e);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.boxCatatan {
+  margin: 2px 0 0 0;
+  font-size: 0.75rem;
+  color: #e6a23c;
+  background-color: rgba(230,162,60,0.05);
+  padding: 5px 8px;
+  border-radius: 6px;
+  border-left: 3px solid #e6a23c;
+}
+
+.actionArea {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.btnEdit {
+  padding: 4px 10px;
+  background-color: var(--bg-toggle, #f2f2f7);
+  color: var(--text-main, #1c1c1e);
+  border: 1px solid var(--border-color, #eef0f3);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnHapus {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background-color: rgba(235, 87, 87, 0.08);
+  color: #eb5757;
+  border: 1px solid rgba(235, 87, 87, 0.15);
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@keyframes melorot {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,312 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 20px 60px 20px; /* Lebihkan padding bawah agar tidak terpotong */
+  box-sizing: border-box;
+  background-color: var(--bg-sidebar, #ffffff);
+  border-left: 1px solid var(--border-light, #eef0f3);
+  width: 300px;
+  height: calc(100vh - 190px); /* Batasi tinggi sesuai sisa viewport agar scroll aktif */
+  position: fixed;
+  top: 190px;
+  right: 0;
+  z-index: 80;
+  overflow-y: auto;
+}
+
+/* 📱 Responsive Mobile */
+@media (max-width: 768px) {
+  .container {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 16px 8px !important;
+    border-left: none !important;
+    margin-bottom: 80px !important;
+    overflow-y: visible !important;
+  }
+}
+
+.widget {
+  background-color: var(--bg-header, #ffffff);
+  border: 1px solid var(--border-light, #eef0f3);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.widgetHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed var(--border-light, #eef0f3);
+  padding-bottom: 8px;
+}
+
+.widgetTitle {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #8e8e93);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0;
+}
+
+.widgetIcon {
+  font-size: 1rem;
+}
+
+/* 🚨 Radar Harga / Log List Styles */
+.logList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.logItem {
+  background-color: var(--bg-main, #f7f8fa);
+  border: 1px solid var(--border-light, #eef0f3);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.logMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  color: var(--text-secondary, #8e8e93);
+  font-weight: 500;
+}
+
+.logDate {
+  font-family: monospace;
+}
+
+.logTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main, #1c1c1e);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logPriceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.logPrices {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.priceOld {
+  text-decoration: line-through;
+  color: var(--text-muted, #a8a8ad);
+}
+
+.priceNew {
+  font-weight: 700;
+  color: var(--text-main, #1c1c1e);
+}
+
+.priceDiff {
+  font-weight: 800;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.priceDiffUp {
+  color: #d9480f;
+  background-color: rgba(217, 72, 15, 0.08);
+}
+
+.priceDiffDown {
+  color: #0a8168;
+  background-color: rgba(10, 129, 104, 0.08);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 16px 8px;
+  color: var(--text-muted, #a8a8ad);
+  font-size: 0.78rem;
+  font-style: italic;
+  margin: 0;
+}
+
+/* 🧮 Margin Calculator Styles */
+.calcForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inputLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary, #8e8e93);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.inputPrepend {
+  position: absolute;
+  left: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted, #a8a8ad);
+  pointer-events: none;
+}
+
+.inputAppend {
+  position: absolute;
+  right: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted, #a8a8ad);
+  pointer-events: none;
+}
+
+.inputField {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light, #eef0f3);
+  border-radius: 8px;
+  background-color: var(--bg-input, #f2f2f7);
+  color: var(--text-main, #1c1c1e);
+  font-size: 0.82rem;
+  font-weight: 600;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.inputField:focus {
+  border-color: var(--accent-emerald, #0a8168);
+}
+
+.inputFieldPrepended {
+  padding-left: 28px;
+}
+
+.inputFieldAppended {
+  padding-right: 36px;
+}
+
+.resultsBox {
+  background-color: var(--bg-secondary, #eef0f3);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  box-sizing: border-box;
+}
+
+.resultRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.76rem;
+}
+
+.resultLabel {
+  color: var(--text-secondary, #8e8e93);
+  font-weight: 500;
+}
+
+.resultValue {
+  font-weight: 700;
+  color: var(--text-main, #1c1c1e);
+}
+
+.resultHighlight {
+  font-weight: 800;
+  color: var(--accent-emerald, #0a8168);
+  font-size: 0.85rem;
+}
+
+/* 🌙 Dark Mode Support overrides */
+:global(body.dark-theme) .widget {
+  background-color: #121214;
+  border-color: #2a2a2a;
+  box-shadow: none;
+}
+
+:global(body.dark-theme) .logItem {
+  background-color: #1a1a1d;
+  border-color: #2a2a2a;
+}
+
+:global(body.dark-theme) .logTitle {
+  color: #e5e5ea;
+}
+
+:global(body.dark-theme) .priceNew {
+  color: #e5e5ea;
+}
+
+:global(body.dark-theme) .priceDiffUp {
+  color: #ffb703; /* Yellow neon */
+  background-color: rgba(255, 183, 3, 0.1);
+}
+
+:global(body.dark-theme) .priceDiffDown {
+  color: #00f5ff; /* Blue neon */
+  background-color: rgba(0, 245, 255, 0.1);
+}
+
+:global(body.dark-theme) .inputField {
+  background-color: #1a1a1d;
+  border-color: #2a2a2a;
+}
+
+:global(body.dark-theme) .inputField:focus {
+  border-color: #00f5ff;
+}
+
+:global(body.dark-theme) .resultsBox {
+  background-color: #1a1a1d;
+  border: 1px solid #2a2a2a;
+}
+
+:global(body.dark-theme) .resultValue {
+  color: #e5e5ea;
+}
+
+:global(body.dark-theme) .resultHighlight {
+  color: #00f5ff;
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
+}
