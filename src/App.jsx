@@ -6,7 +6,6 @@ import Header from './component/header/Header.jsx';
 import BelanjaAgen from './pages/BelanjaAgen/BelanjaAgen.jsx';
 import HistoryWarung from './pages/History/HistoryWarung.jsx';
 import { initialBarang } from './data/initialBarang.js';
-import RightSidebar from './component/sidebar/RightSidebar.jsx';
 import './global.css'; // 🎯 Pastikan diimport sebagai CSS biasa, bukan module!
 
 function App() {
@@ -210,11 +209,19 @@ function App() {
         }
 
         // Hitung modal per pcs dari total harga agen bila perlu
+       // ── DISINI AI SUDAH MENGHITUNG MODAL ECERANNYA ──
         let modalEceranAwal = perPieceFromTotal(totalHargaAgen, minimalGrosirBesarDefault);
 
-        let hargaJualMurni = Number(itemLama.jual || itemLama.hargaJual || 0);
+        // ── BARIS INI YANG KAMU GANTI/PERBARUI ──
+        let hargaJualMurni = Number(itemLama.hargaEceran || itemLama.jual || itemLama.hargaJual || 0);
+
         if (hargaJualMurni === 0) {
-          hargaJualMurni = Math.round(modalEceranAwal * 1.15);
+          // JALUR DARURAT: Jika data eceran kosong (seperti Aice), markup 15% & bulatkan ke kelipatan Rp 500 terdekat
+          const hargaMentah = modalEceranAwal * 1.15;
+          hargaJualMurni = Math.ceil(hargaMentah / 500) * 500;
+        } else {
+          // JALUR AMAN: Jika hargaEceran dari kamu ada (seperti Djarum Rp 18.000), pakai angka itu bulat murni!
+          hargaJualMurni = Math.round(hargaJualMurni);
         }
 
         let catatanGabungan = '';
@@ -222,15 +229,13 @@ function App() {
           catatanGabungan = `[Eks App Teks]: ${itemLama.catatanUtama || ''} ${itemLama.catatanHarga || ''}`;
         }
 
-        const satuanBarang = itemLama.satuanBeli || 'Pcs';
-
         return {
           id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           nama: itemLama.nama || 'Tanpa Nama',
           modal: modalEceranAwal, 
           jual: hargaJualMurni,   
-          satuanModal: satuanBarang, 
-          satuanJual: satuanBarang, 
+          satuanModal: itemLama.satuanBeli || 'Pcs', 
+          satuanJual: 'Pcs', 
           varian: itemLama.varian || [],
           bisaGrosir: true,
           minimalBeliGrosir: minimalGrosirDefault,
@@ -293,9 +298,9 @@ function App() {
     if (isMobile && activePage === 'dashboard') {
       return (
         <div style={{ 
-          boxSizing: 'border-box', width: '100%', backgroundColor: 'var(--bg-main, #f7f8fa)', minHeight: '100vh',
-          position: 'fixed', top: 'calc(var(--dynamic-header-height, 235px) + 12px)', left: 0,
-          height: 'calc(100vh - calc(var(--dynamic-header-height, 235px) + 12px))', 
+          boxSizing: 'border-box', width: '100%', backgroundColor: 'var(--bg-body)', minHeight: '100vh',
+          position: 'fixed', top: 'calc(var(--dynamic-header-height, 210px) + 12px)', left: 0,
+          height: 'calc(100vh - calc(var(--dynamic-header-height, 210px) + 12px))', 
           overflowY: 'auto', padding: '20px 16px 80px 16px',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}>
@@ -427,10 +432,10 @@ function App() {
             </div>
           ) : null
         ) : (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '240px', height: '100vh', backgroundColor: 'var(--bg-sidebar, #121214)', borderRight: '1px solid var(--border-light, #2a2a2a)', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', zIndex: 90 }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '240px', height: '100vh', backgroundColor: '#121214', borderRight: '1px solid #2a2a2a', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', zIndex: 90 }}>
             <p style={{ fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '15px' }}>NAVIGASI</p>
             <MainMenuNav halamanAktif={activePage} onMenuClick={handleMenuClick} />
-            <div style={{ marginTop: 'auto', background: 'var(--bg-main, #121212)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-light, #2a2a2a)' }}>
+            <div style={{ marginTop: 'auto', background: '#121212', padding: '12px', borderRadius: '8px', border: '1px solid #2a2a2a' }}>
               <p style={{ color: 'var(--text-muted)' }}>Status App</p>
               <p style={{ color: '#00e676', fontWeight: 'bold', marginTop: '4px' }}>Rp Ready</p>
             </div>
@@ -443,7 +448,16 @@ function App() {
         </div>
       }
       rightPanel={
-        <RightSidebar logPerubahanHarga={logPerubahanHarga} />
+        <div style={!isMobile ? { position: 'fixed', top: '195px', right: 0, width: '300px', height: '100vh', display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px', boxSizing: 'border-box', backgroundColor: '#ffffff', borderLeft: '1px solid #eef0f3' } : { display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', boxSizing: 'border-box' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', border: '1px solid #eef0f3' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#1a1a1a', fontSize: '0.95rem' }}>Fitur Kanan</h4>
+            <p style={{ fontSize: '0.8rem', color: '#88888b', margin: 0 }}>Log cepat aktif.</p>
+          </div>
+          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', border: '1px solid #eef0f3', flexGrow: 1 }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#1a1a1a', fontSize: '0.95rem' }}>Informasi Tambahan</h4>
+            <p style={{ fontSize: '0.8rem', color: '#88888b', margin: 0 }}>Ringkasan performa warung hari ini.</p>
+          </div>
+        </div>
       }
     />
   );
