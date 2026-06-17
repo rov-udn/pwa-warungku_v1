@@ -4,35 +4,46 @@ import { createPortal } from 'react-dom';
 function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const isEdit = modalMode === 'edit' && barangAktif;
 
-  // ── 🍏 STATE UTAMA ──
+  // ── 🍏 STATE UTAMA (NAMA & VARIAN) ──
   const [nama, setNama] = useState(isEdit ? (barangAktif.nama || '') : '');
   const [catatan, setCatatan] = useState(isEdit ? (barangAktif.catatan || '') : '');
   const [punyaVarian, setPunyaVarian] = useState(isEdit ? (barangAktif.varian?.length > 0 || false) : false);
   const [varianInput, setVarianInput] = useState(isEdit ? (barangAktif.varian?.join(', ') || '') : '');
 
-  // ── 📦 LOGIKA: INPUT DARI SATUAN TERBESAR (NOTA AGEN) ──
-  const [satuanTerbesar, setSatuanTerbesar] = useState(isEdit ? (barangAktif.satuanTerbesar || 'Dus') : 'Dus');
-  const [hargaModalAgen, setHargaModalAgen] = useState(isEdit ? (barangAktif.hargaModalAgen || '') : '');
-  const [isiKeEceran, setIsiKeEceran] = useState(isEdit ? (barangAktif.isiKeEceran || '1') : '1');
-  const [satuanEceran, setSatuanEceran] = useState(isEdit ? (barangAktif.satuanModal || 'Pcs') : 'Pcs');
+  // ── 📦 TANGGA 3: INPUT KULAKAN TERBESAR (NOTA AGEN) ──
+  const [satuanGrosirBesarNama, setSatuanGrosirBesarNama] = useState(isEdit ? (barangAktif.satuanGrosirBesarNama || 'Dus') : 'Dus');
+  const [hargaModalAgenTotal, setHargaModalAgenTotal] = useState(isEdit ? (barangAktif.hargaModalGrosirBesarTotal || '') : '');
+  const [isiKeEceran, setIsiKeEceran] = useState(isEdit ? (barangAktif.minimalBeliGrosirBesar || '60') : '60');
 
-  // State jualan eceran toko
+  // ── 🍏 TANGGA 1: LEVEL ECERAN TERKECIL ──
+  const [satuanEceran, setSatuanEceran] = useState(isEdit ? (barangAktif.satuanModal || 'Pcs') : 'Pcs');
   const [jualEceran, setJualEceran] = useState(isEdit ? (barangAktif.jual || '') : '');
+
+  // ── 🛒 TANGGA 2: GROSIR LEVEL MENENGAH (SLOP/RENTENG) ──
+  const [bisaGrosir, setBisaGrosir] = useState(isEdit ? (barangAktif.bisaGrosir || false) : false);
+  const [satuanGrosirNama, setSatuanGrosirNama] = useState(isEdit ? (barangAktif.satuanGrosirNama || 'Slop') : 'Slop');
+  const [minimalBeliGrosir, setMinimalBeliGrosir] = useState(isEdit ? (barangAktif.minimalBeliGrosir || '10') : '10');
+  const [jualGrosirTotal, setJualGrosirTotal] = useState(isEdit ? (barangAktif.jualGrosirTotal || '') : '');
+
+  // ── 🛒 TANGGA 3 KELUARAN: JUAL GROSIR BESAR TOKO ──
+  const [bisaGrosirBesar, setBisaGrosirBesar] = useState(isEdit ? (barangAktif.bisaGrosirBesar || false) : false);
+  const [jualGrosirBesarTotal, setJualGrosirBesarTotal] = useState(isEdit ? (barangAktif.jualGrosirBesarTotal || '') : '');
 
   // ⚖️ STATE TIMBANGAN CURAH (Kg/Liter)
   const [beratKonversi, setBeratKonversi] = useState(isEdit ? (barangAktif.beratKonversi || '1') : '1');
 
-  // ── 🛒 STATE HARGA JUAL GROSIR (OPSIONAL) ──
-  const [bisaGrosirToko, setBisaGrosirToko] = useState(isEdit ? (barangAktif.bisaGrosir || false) : false);
-  const [jualGrosirTotal, setJualGrosirTotal] = useState(isEdit ? (barangAktif.jualGrosirTotal || '') : '');
-
-  // 🛡️ SECURITY GUARD: Pindahkan pengecekan isOpen ke bawah setelah semua state dideklarasikan!
+  // 🛡️ SECURITY GUARD: Jalankan setelah semua state ter-deklarasi (Lolos ESLint)
   if (!isOpen) return null;
 
-  // 🧮 LIVE HITUNG TANPA EFFECT: Bersih, cepat, presisi, dan lolos ESLint!
-  const harga = Number(hargaModalAgen) || 0;
-  const isi = Number(isiKeEceran) || 1;
-  const modalEceranTerhitung = harga > 0 && isi > 0 ? (harga / isi).toFixed(4) : '0';
+  // 🧮 LIVE CALCULATION (MATEMATIKA LANGSUNG TANPA EFFECT - LOLOS SENSOR ESLINT)
+  const hargaAgen = Number(hargaModalAgenTotal) || 0;
+  const totalIsiEceran = Number(isiKeEceran) || 1;
+  
+  // 1. Hitung Modal Eceran Asli (Disimpan presisi di database)
+  const modalEceranTerhitung = hargaAgen > 0 && totalIsiEceran > 0 ? (hargaAgen / totalIsiEceran).toFixed(4) : '0';
+
+  // 2. Hitung Otomatis Modal untuk Level Menengah (Isi Slop x Modal Eceran)
+  const modalGrosirMenengahTerhitung = Number(modalEceranTerhitung) * (Number(minimalBeliGrosir) || 0);
 
   const isBarangTimbangan = satuanEceran === 'Kg' || satuanEceran === 'Liter' || catatan.toLowerCase().includes('kilo') || catatan.toLowerCase().includes('curah');
 
@@ -45,7 +56,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!nama || Number(modalEceranTerhitung) <= 0 || !jualEceran) { alert("Nama, Modal, dan Harga Jual wajib dilengkapi ya, Fi!"); return; }
+    if (!nama || Number(modalEceranTerhitung) <= 0 || !jualEceran) { alert("Nama, Modal Kulakan, dan Harga Jual Eceran wajib diisi ya, Fi!"); return; }
 
     onSimpan({
       nama,
@@ -57,18 +68,26 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       beratKonversi: Number(beratKonversi) || 1,
       varian: punyaVarian ? varianInput.split(',').map(v => v.trim()).filter(v => v !== '') : [],
       
-      // Data tambahan kulakan disimpan untuk kebutuhan edit data nanti
-      satuanTerbesar,
-      hargaModalAgen: Number(hargaModalAgen),
-      isiKeEceran: Number(isiKeEceran),
+      // Data Mentah Kulakan Nota Agen (Untuk kebutuhan Edit Data besok)
+      satuanTerbesar: satuanGrosirBesarNama,
+      hargaModalAgen: hargaAgen,
+      isiKeEceran: totalIsiEceran,
 
-      // Fitur Grosir Toko (Jika kamu jual grosiran lagi ke orang lain)
-      bisaGrosir: bisaGrosirToko,
-      satuanGrosirNama: bisaGrosirToko ? satuanTerbesar : '',
-      minimalBeliGrosir: bisaGrosirToko ? Number(isiKeEceran) : null,
-      modalGrosirTotal: bisaGrosirToko ? Number(hargaModalAgen) : null,
-      jualGrosirTotal: bisaGrosirToko ? Number(jualGrosirTotal) : null,
-      jualGrosir: bisaGrosirToko ? Math.round(Number(jualGrosirTotal) / Math.max(1, Number(isiKeEceran))) : null
+      // TANGGA 2: Grosir Level Menengah (Slop/Renteng)
+      bisaGrosir,
+      satuanGrosirNama: bisaGrosir ? satuanGrosirNama : '',
+      minimalBeliGrosir: bisaGrosir ? Number(minimalBeliGrosir) : null,
+      modalGrosirTotal: bisaGrosir ? modalGrosirMenengahTerhitung : null,
+      jualGrosirTotal: bisaGrosir ? Number(jualGrosirTotal) : null,
+      jualGrosir: bisaGrosir ? Math.round(Number(jualGrosirTotal) / Math.max(1, Number(minimalBeliGrosir))) : null,
+
+      // TANGGA 3: Grosir Level Besar (Dus/Bal)
+      bisaGrosirBesar,
+      satuanGrosirBesarNama: bisaGrosirBesar ? satuanGrosirBesarNama : '',
+      minimalBeliGrosirBesar: bisaGrosirBesar ? totalIsiEceran : null,
+      modalGrosirBesarTotal: bisaGrosirBesar ? hargaAgen : null,
+      jualGrosirBesarTotal: bisaGrosirBesar ? Number(jualGrosirBesarTotal) : null,
+      jualGrosirBesarPerPcs: bisaGrosirBesar ? Math.round(Number(jualGrosirBesarTotal) / Math.max(1, totalIsiEceran)) : null
     });
     onClose();
   };
@@ -83,32 +102,32 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingRight: '4px' }}>
           
-          {/* 1. NAMA BARANG */}
+          {/* NAMA BARANG */}
           <div>
             <label style={styleLabel}>Nama Barang</label>
             <input type="text" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Contoh: Roti Aoka Cokelat" style={styleBoxInput} />
           </div>
 
-          {/* 2. PANEL UTAMA: KULAKAN DARI AGEN */}
+          {/* 📦 TANGGA UTAMA KULAKAN (INPUT NOTA AGEN) */}
           <div style={{ backgroundColor: 'rgba(10, 129, 104, 0.04)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(10, 129, 104, 0.15)' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#0a8168', display: 'block', marginBottom: '8px' }}>📥 Data Kulakan Nota Agen</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#0a8168', display: 'block', marginBottom: '8px' }}>📥 TANGGA 3: Kulakan Terbesar (Nota Agen)</span>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px', marginBottom: '8px' }}>
               <div>
                 <label style={styleLabel}>Beli Satuan Terbesar</label>
-                <select value={satuanTerbesar} onChange={(e) => setSatuanTerbesar(e.target.value)} style={{ ...styleBoxInput, backgroundColor: '#ffffff', fontWeight: '600' }}>
-                  {['Dus', 'Karung/Sak', 'Slop', 'Renteng', 'Pak', 'Ball', 'Pcs/Eceran Direct'].map(s => <option key={s} value={s}>{s}</option>)}
+                <select value={satuanGrosirBesarNama} onChange={(e) => setSatuanGrosirBesarNama(e.target.value)} style={{ ...styleBoxInput, backgroundColor: '#ffffff', fontWeight: '600' }}>
+                  {['Dus', 'Karung/Sak', 'Slop', 'Renteng', 'Pak', 'Ball', 'Karton'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
-                <label style={styleLabel}>Harga Nota 1 {satuanTerbesar}</label>
-                <input type="number" value={hargaModalAgen} onChange={(e) => setHargaModalAgen(e.target.value)} placeholder="Msl: 100000" style={{ ...styleBoxInput, backgroundColor: '#ffffff' }} />
+                <label style={styleLabel}>Harga Modal 1 {satuanGrosirBesarNama}</label>
+                <input type="number" value={hargaModalAgenTotal} onChange={(e) => setHargaModalAgenTotal(e.target.value)} placeholder="Msl: 100000" style={{ ...styleBoxInput, backgroundColor: '#ffffff' }} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
               <div>
-                <label style={styleLabel}>Isi per 1 {satuanTerbesar}</label>
+                <label style={styleLabel}>Total Isi Eceran per {satuanGrosirBesarNama}</label>
                 <div style={styleRowGrid}>
                   <input type="number" value={isiKeEceran} onChange={(e) => setIsiKeEceran(e.target.value)} placeholder="60" style={{ ...styleBoxInput, width: '50%', borderRadius: '8px 0 0 8px', borderRight: 'none', backgroundColor: '#ffffff', textAlign: 'center' }} />
                   <select value={satuanEceran} onChange={(e) => setSatuanEceran(e.target.value)} style={{ ...styleBoxInput, width: '50%', borderRadius: '0 8px 8px 0', backgroundColor: 'var(--border-color, #e5e5ea)', fontWeight: '600' }}>
@@ -117,13 +136,13 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
                 </div>
               </div>
               <div>
-                <label style={styleLabel}>💰 Modal Eceran (Auto)</label>
+                <label style={styleLabel}>💰 Hasil Modal Eceran (Auto)</label>
                 <input type="text" value={Number(modalEceranTerhitung) > 0 ? `Rp ${Math.round(Number(modalEceranTerhitung)).toLocaleString('id-ID')}` : 'Rp 0'} readOnly style={styleBoxInputReadOnly} />
               </div>
             </div>
           </div>
 
-          {/* 3. HARGA JUAL TOKO */}
+          {/* 🍏 TANGGA 1: HARGA JUAL ECERAN TOKO */}
           <div>
             <label style={styleLabel}>Harga Jual Eceran Toko</label>
             <div style={styleRowGrid}>
@@ -134,7 +153,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
             </div>
           </div>
 
-          {/* ⚖️ PANEL: INPUT BERAT KONVERSI KHUSUS BARANG KILOAN / CURAH */}
+          {/* ⚖️ PANEL TIMBANGAN CURAH */}
           {isBarangTimbangan && (
             <div style={{ backgroundColor: 'rgba(255, 149, 0, 0.08)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255, 149, 0, 0.2)' }}>
               <label style={{ ...styleLabel, color: '#c67c00' }}>⚖️ Set Ukuran Timbangan Eceran Ini</label>
@@ -143,13 +162,10 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
                 <input type="number" step="0.01" value={beratKonversi} onChange={(e) => setBeratKonversi(e.target.value)} placeholder="0.25" style={{ ...styleBoxInput, width: '80px', textAlign: 'center', borderColor: 'rgba(255, 149, 0, 0.4)' }} />
                 <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-main)' }}>Kg / Liter asli</span>
               </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.68rem', color: '#8e8e93', lineHeight: '1.2' }}>
-                💡 Tips: Jika eceran ukuran Seprapat isi <code>0.25</code>, jika Setengah Kilo isi <code>0.5</code>, jika Se-kilo isi <code>1</code>.
-              </p>
             </div>
           )}
 
-          {/* 4. OPSI VARIAN */}
+          {/* OPSI VARIAN */}
           <div style={{ borderTop: '1px dashed var(--border-color, #eef0f3)', paddingTop: '6px' }}>
             <label style={styleFlexCheck}>
               <input type="checkbox" checked={punyaVarian} onChange={(e) => setPunyaVarian(e.target.checked)} />
@@ -163,31 +179,75 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
             )}
           </div>
 
-          {/* 5. OPSIONAL: HARGA JUAL GROSIR TOKO */}
+          {/* 🛒 TANGGA 2: GROSIR LEVEL MENENGAH (SLOP/RENTENG) */}
           <div style={{ borderTop: '1px dashed var(--border-color, #eef0f3)', paddingTop: '6px' }}>
             <label style={styleFlexCheck}>
-              <input type="checkbox" checked={bisaGrosirToko} onChange={(e) => setBisaGrosirToko(e.target.checked)} />
-              Aktifkan Harga Jual Grosir Toko untuk Pelanggan?
+              <input type="checkbox" checked={bisaGrosir} onChange={(e) => setBisaGrosir(e.target.checked)} />
+              Aktifkan Grosir Level Menengah Toko? (Slop/Renteng)
             </label>
 
-            {bisaGrosirToko && (
+            {bisaGrosir && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', padding: '10px', backgroundColor: 'rgba(10, 129, 104, 0.05)', borderRadius: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={styleLabel}>Nama Satuan Grosir Menengah</label>
+                    <select value={satuanGrosirNama} onChange={(e) => setSatuanGrosirNama(e.target.value)} style={{ ...styleBoxInput, backgroundColor: 'var(--border-color, #e5e5ea)', fontWeight: '600' }}>
+                      {['Slop', 'Renteng', 'Pak', 'Pak Kecil', 'Lempeng'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={styleLabel}>Isi per 1 {satuanGrosirNama} (Jumlah {satuanEceran})</label>
+                    <input type="number" value={minimalBeliGrosir} onChange={(e) => setMinimalBeliGrosir(e.target.value)} placeholder="10" style={styleBoxInput} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={styleLabel}>📥 Modal 1 {satuanGrosirNama} (Auto)</label>
+                    <input type="text" value={minimalBeliGrosir ? `Rp ${Math.round(modalGrosirMenengahTerhitung).toLocaleString('id-ID')}` : 'Rp 0'} readOnly style={styleBoxInputReadOnly} />
+                  </div>
+                  <div>
+                    <label style={styleLabel}>📤 Harga Jual 1 {satuanGrosirNama} Total</label>
+                    <input type="number" value={jualGrosirTotal} onChange={(e) => setJualGrosirTotal(e.target.value)} placeholder="Msl: 18000" style={styleBoxInput} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 🛒 TANGGA 3: JUAL KEMBALI GROSIR LEVEL BESAR */}
+          <div style={{ borderTop: '1px dashed var(--border-color, #eef0f3)', paddingTop: '6px' }}>
+            <label style={styleFlexCheck}>
+              <input type="checkbox" checked={bisaGrosirBesar} onChange={(e) => setBisaGrosirBesar(e.target.checked)} />
+              Aktifkan Harga Jual Grosir Level Besar ke Pelanggan?
+            </label>
+
+            {bisaGrosirBesar && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', padding: '10px', backgroundColor: 'rgba(0, 122, 255, 0.05)', borderRadius: '8px' }}>
-                <label style={styleLabel}>Harga Jual Kembali per 1 {satuanTerbesar} Utuh</label>
-                <input type="number" value={jualGrosirTotal} onChange={(e) => setJualGrosirTotal(e.target.value)} placeholder="Msl: 120000" style={styleBoxInput} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={styleLabel}>📥 Modal 1 {satuanGrosirBesarNama} (Nota Agen)</label>
+                    <input type="text" value={hargaAgen ? `Rp ${hargaAgen.toLocaleString('id-ID')}` : 'Rp 0'} readOnly style={styleBoxInputReadOnly} />
+                  </div>
+                  <div>
+                    <label style={styleLabel}>📤 Harga Jual 1 {satuanGrosirBesarNama} Keluar</label>
+                    <input type="number" value={jualGrosirBesarTotal} onChange={(e) => setJualGrosirBesarTotal(e.target.value)} placeholder="Msl: 120000" style={styleBoxInput} />
+                  </div>
+                </div>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.65rem', color: '#007aff' }}>
-                  📈 Mengaktifkan ini otomatis membuat pelanggan yang beli sebanyak <code>{isiKeEceran} {satuanEceran}</code> mendapatkan harga paket grosir utuh.
+                  📈 Mengaktifkan ini otomatis membuat pelanggan yang beli langsung sebanyak <code>{isiKeEceran} {satuanEceran}</code> dapet harga grosir besar utuh.
                 </p>
               </div>
             )}
           </div>
 
-          {/* 6. CATATAN */}
+          {/* CATATAN */}
           <div>
             <label style={styleLabel}>Catatan Tambahan (Opsional)</label>
             <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Ketik catatan di sini..." style={{ ...styleBoxInput, resize: 'none', height: '36px' }} />
           </div>
 
-          {/* 7. TOMBOL AKSI */}
+          {/* TOMBOL AKSI */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
             <button type="button" onClick={onClose} style={{ flex: 1, padding: '9px', backgroundColor: 'var(--border-color, #f2f2f7)', border: 'none', borderRadius: '8px', fontWeight: '700', color: 'var(--text-muted, #8e8e93)', cursor: 'pointer' }}>Batal</button>
             <button type="submit" style={{ flex: 1, padding: '9px', backgroundColor: '#0a8168', border: 'none', borderRadius: '8px', fontWeight: '700', color: '#ffffff', cursor: 'pointer' }}>Simpan</button>
