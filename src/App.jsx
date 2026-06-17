@@ -123,33 +123,17 @@ function App() {
     setLogPerubahanHarga((prev) => [entry, ...prev]);
   }, []);
 
-  // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN ──
-  const handleKoreksiNota = useCallback((idNota, itemsDiperbarui) => {
-    const itemsNormalized = itemsDiperbarui.map(item => ({
-      ...item,
-      modalBaru: item.hargaBaru !== undefined ? item.hargaBaru : item.modalBaru
-    }));
-    const notaLama = historyBelanja.find(nota => nota.id === idNota);
-    const itemsYangBerubahHarga = [];
-
-    if (notaLama) {
-      itemsNormalized.forEach(itemBaru => {
-        const itemLama = notaLama.items.find(item => item.id === itemBaru.id);
-        if (!itemLama || itemLama.modalBaru !== itemBaru.modalBaru) {
-          itemsYangBerubahHarga.push(itemBaru);
-        }
-      });
-    } else {
-      itemsYangBerubahHarga.push(...itemsNormalized);
-    }
-
+  // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (VERSI SINKRONISASI MASSAL) ──
+  const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
+    
+    // 1. UPDATE HISTORY & TOTAL NOTA BARU
     setHistoryBelanja((prevHistory) => {
       const historyUpdate = prevHistory.map((nota) => {
         if (nota.id === idNota) {
           return {
             ...nota,
-            items: itemsNormalized,
-            totalPengeluarannya: itemsNormalized.reduce((sum, item) => sum + (item.modalBaru * item.qty), 0)
+            items: itemsDiperbarui,
+            totalPengeluarannya: totalPengeluaranBaru
           };
         }
         return nota;
@@ -158,10 +142,36 @@ function App() {
       return historyUpdate;
     });
 
-    itemsYangBerubahHarga.forEach((item) => {
-      handleUpdateHargaModal(item.id, item.modalBaru, item.satuanModal);
+    // 2. ⚡ SINKRONISASI MASSAL KE DATA MASTER GUDANG & BELANJA AGEN
+    setDaftarBarang((prevBarang) => {
+      const barangUpdate = prevBarang.map((barang) => {
+        // Cari apakah barang ini termasuk yang barusan dikoreksi di dalam nota
+        const itemKoreksi = itemsDiperbarui.find(item => item.id === barang.id);
+        
+        if (itemKoreksi) {
+          // Ambal nilai modal eceran terkecil hasil pembagian otomatis dari HistoryWarung
+          const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
+          const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
+
+          // Hitung ulang modal jembatan tengah toko (Modal Eceran Baru x Jumlah Isinya)
+          const isiJembatanTengah = Number(barang.minimalBeliGrosir) || 10;
+          const modalGrosirMenengahBaru = Number((modalEceranBaru * isiJembatanTengah).toFixed(4));
+
+          return {
+            ...barang,
+            modal: modalEceranBaru,                // 🍏 Update Modal Eceran Terkecil di Buku Warung!
+            hargaModalAgen: hargaNotaAgenBaru,      // 📥 Update Modal Nota Terbesar di Belanja Agen!
+            modalGrosirTotal: modalGrosirMenengahBaru // ⚙️ Update Modal Jembatan Tengah Toko!
+          };
+        }
+        return barang;
+      });
+
+      localStorage.setItem('warung_daftar_barang', JSON.stringify(barangUpdate));
+      return barangUpdate;
     });
-  }, [historyBelanja, handleUpdateHargaModal]);
+
+  }, []);
 
   // ── 📅 FUNGSI TAMBAH HISTORY BELANJAAN ──
   const handleTambahHistoryBelanja = useCallback((keranjangData) => {

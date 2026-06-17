@@ -14,10 +14,12 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
 
-  // ── 🏷️ DAFTAR KATEGORI UNTUK QUICK FILTER (Sama persis dengan Belanja Agen) ──
+  // ── 🎯 STATE UTAMA LOGIKA ANTI-RUGI ROFI ──
+  const [filterRugiAktif, setFilterRugiAktif] = useState(false);
+
+  // ── 🏷️ DAFTAR KATEGORI UNTUK QUICK FILTER ──
   const daftarKategori = ['Semua', 'Sembako', 'Rokok', 'Mie Instan', 'Kopi / Minuman', 'Sabun / Sampo', 'Camilan'];
 
-  // Fungsi radar otomatis untuk mengelompokkan barang berdasarkan nama
   const dapatkanKategoriBarang = (nama) => {
     const namaKecil = nama.toLowerCase();
     if (namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya')) return 'Rokok';
@@ -28,15 +30,46 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
     return 'Sembako';
   };
 
-  // ── 🔍 FILTER DOUBLE SAKTI: SEARCH TEXT + KATEGORI KLIK (FIXED) ──
+  // ── 🧮 1. LIVE SCANN ANTI-RUGI ──
+  const jumlahBarangRugi = useMemo(() => {
+    return daftarBarang.filter(barang => {
+      const eceranRugi = Number(barang.jual) < Number(barang.modal);
+      const grosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal 
+        ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
+        : false;
+      return eceranRugi || grosirRugi;
+    }).length;
+  }, [daftarBarang]);
+
+  // ── 🔍 2. FILTER DATA BARANG ──
   const barangFiltered = useMemo(() => {
     return daftarBarang.filter((barang) => {
       const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
       const katBarang = dapatkanKategoriBarang(barang.nama);
       const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
+      
+      const eceranRugi = Number(barang.jual) < Number(barang.modal);
+      const grosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal 
+        ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
+        : false;
+      const apakahRugi = eceranRugi || grosirRugi;
+
+      if (filterRugiAktif) {
+        return cocokSearch && cocokKategori && apakahRugi;
+      }
+
       return cocokSearch && cocokKategori;
     });
-  }, [daftarBarang, searchTerm, kategoriAktif]);
+  }, [daftarBarang, searchTerm, kategoriAktif, filterRugiAktif]);
+
+  // ── 🧮 3. FUNGSI HITUNG MARGIN UNTUK TAMPILAN LAYAR KASIR ──
+  const hitungMarginCuan = (hargaModal, hargaJual) => {
+    const modal = Number(hargaModal) || 0;
+    const jual = Number(hargaJual) || 0;
+    if (jual <= 0 || jual <= modal) return 0;
+    const persentase = ((jual - modal) / jual) * 100;
+    return persentase.toFixed(1);
+  };
 
   const bukaModalTambah = () => {
     setModalMode('tambah');
@@ -53,12 +86,9 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
   };
 
   const handleSimpanTerpisah = (dataBaru) => {
-    
     if (modalMode === 'tambah') {
       onTambahBarang(dataBaru);
     } else {
-      // Jika harga modal berubah pada edit, catat perubahan harga melalui handler global
-      // Simpan perubahan terlebih dahulu, lalu kirim sinyal log perubahan harga
       onEditBarang(idBarangAktif, dataBaru);
       try {
         const modalLama = barangAktif?.modal || 0;
@@ -97,7 +127,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
   return (
     <div className={styles.container}>
       
-      {/* ── 🏷️ HEADER ATAS HALAMAN ── */}
+      {/* HEADER AREA */}
       <div className={styles.headerArea}>
         <h2 className={styles.mainTitle}>Buku Warung (Data Barang)</h2>
         <p className={styles.subHeader}>
@@ -105,7 +135,44 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         </p>
       </div>
 
-      {/* ── 📊 BARIS TOMBOL TAMBAH & INPUT CARI ── */}
+      {/* BANNER NOTIFIKASI BARANG RUGI */}
+      {jumlahBarangRugi > 0 && (
+        <div 
+          onClick={() => setFilterRugiAktif(!filterRugiAktif)}
+          style={{
+            backgroundColor: filterRugiAktif ? '#ff3b30' : 'rgba(255, 59, 48, 0.08)',
+            border: '1px solid #ff3b30',
+            borderRadius: '12px',
+            padding: '12px 16px',
+            marginBottom: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: filterRugiAktif ? '0 4px 14px rgba(255, 59, 48, 0.35)' : 'none',
+            boxSizing: 'border-box',
+            width: '100%'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '800', color: filterRugiAktif ? '#ffffff' : '#ff3b30' }}>
+                Ada {jumlahBarangRugi} Barang Jual Rugi / Belum Naik Harga!
+              </p>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: filterRugiAktif ? 'rgba(255,255,255,0.85)' : 'var(--text-muted, #8e8e93)' }}>
+                {filterRugiAktif ? '👉 Menampilkan barang boncos saja (Klik untuk membatalkan)' : '👉 Klik di sini untuk jalan pintas perbaiki harga!'}
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: '800', backgroundColor: filterRugiAktif ? '#ffffff' : '#ff3b30', color: filterRugiAktif ? '#ff3b30' : '#ffffff', padding: '4px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+            {filterRugiAktif ? 'Lihat Semua' : 'Shortcut Scann'}
+          </span>
+        </div>
+      )}
+
+      {/* BARIS TOMBOL TAMBAH & CARI */}
       <div>
         <div className={styles.searchRow}>
           <input 
@@ -115,7 +182,6 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
             onChange={(e) => setSearchTerm(e.target.value)}
             className={styles.searchBar}
           />
-          {/* FIX: Diubah ke bukaModalTambah agar tidak crash not defined */}
           <button onClick={bukaModalTambah} className={styles.btnTambah}>
             + Barang
           </button>
@@ -124,15 +190,15 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
           </button>
         </div>
 
-        {/* 🟢 TOMBOL KATEGORI SCROLL HORIZONTAL KHAS KASIR MODERN 🟢 */}
+        {/* SCROLL HORIZONTAL KATEGORI */}
         <div className={styles.scrollKategori}>
           {daftarKategori.map((kat) => {
-            const isAktif = kategoriAktif === kat;
+            const isAktif = kategoriAktif === kat && !filterRugiAktif;
             return (
               <button
                 key={kat}
                 type="button"
-                onClick={() => setKategoriAktif(kat)}
+                onClick={() => { setKategoriAktif(kat); setFilterRugiAktif(false); }}
                 className={`${styles.btnKategoriPill} ${isAktif ? styles.btnKategoriActive : ''}`}
               >
                 {kat}
@@ -142,34 +208,66 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         </div>
       </div>
 
-      {/* ── 📦 LIST KARTU DAFTAR BARANG (ACCORDION) ── */}
+      {/* LIST KARTU DAFTAR BARANG */}
       <div className={styles.listContainer}>
-        {/* FIX: Menggunakan barangFiltered agar fitur klik kategori berfungsi menyaring barang */}
         {barangFiltered.length > 0 ? (
           barangFiltered.map((barang) => {
             const isTerbuka = idCardTerbuka === barang.id;
+
+            const isEceranRugi = Number(barang.jual) < Number(barang.modal);
+            const isGrosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal 
+              ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
+              : false;
+            const apakahRugi = isEceranRugi || isGrosirRugi;
+
+            // Hitung persentase untung eceran
+            const marginEceran = hitungMarginCuan(barang.modal, barang.jual);
 
             return (
               <div 
                 key={barang.id}
                 onClick={() => setIdCardTerbuka(isTerbuka ? null : barang.id)}
                 className={styles.cardItem}
+                style={{
+                  border: apakahRugi ? '1px solid rgba(255, 59, 48, 0.45)' : '1px solid var(--border-color, #eef0f3)',
+                  backgroundColor: apakahRugi ? 'rgba(255, 59, 48, 0.01)' : 'var(--bg-header, #ffffff)'
+                }}
               >
                 {/* Info Utama Barang (Selalu Terlihat) */}
                 <div className={styles.cardMainInfo}>
-                  {/* SUNTIKKAN BADGE TAG KATEGORI OTOMATIS */}
-                  <span className={styles.badgeKategori}>
-                    {dapatkanKategoriBarang(barang.nama)}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span className={styles.badgeKategori}>
+                      {dapatkanKategoriBarang(barang.nama)}
+                    </span>
+                    
+                    {apakahRugi && (
+                      <span style={{ backgroundColor: '#ff3b30', color: '#ffffff', fontSize: '0.65rem', fontWeight: '900', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.5px' }}>
+                        ⚠️ RUGI
+                      </span>
+                    )}
+                  </div>
 
                   <h4 className={styles.barangNama}>{barang.nama}</h4>
                   <div className={styles.priceGrid}>
-                    <span>M: <strong style={{ color: 'var(--text-main)' }}>Rp {barang.modal?.toLocaleString('id-ID')}</strong>/{barang.satuanModal || 'Pcs'}</span>
-                    <span>Jual: <strong style={{ color: '#0a8168' }}>Rp {barang.jual?.toLocaleString('id-ID')}</strong>/{barang.satuanJual || 'Pcs'}</span>
+                    <span>M: <strong style={{ color: 'var(--text-main)' }}>Rp {barang.modal ? Math.round(barang.modal).toLocaleString('id-ID') : 0}</strong>/{barang.satuanModal || 'Pcs'}</span>
+                    <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>Rp {barang.jual?.toLocaleString('id-ID')}</strong>/{barang.satuanJual || 'Pcs'}</span>
+                  </div>
+
+                  {/* 🟢 TAMPILAN MARGIN CUAN LANGSUNG DI KARTU UTAMA ── */}
+                  <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
+                    {Number(marginEceran) > 0 ? (
+                      <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                        📈 Margin Untung: {marginEceran}% (+Rp {Math.round(barang.jual - barang.modal).toLocaleString('id-ID')})
+                      </span>
+                    ) : (
+                      <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                        🛑 Jual Rugi: Selisih Rp {Math.round(barang.modal - barang.jual).toLocaleString('id-ID')}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* ── 🔽 PANEL DETAIL MEKAR ── */}
+                {/* PANEL DETAIL MEKAR */}
                 {isTerbuka && (
                   <div onClick={(e) => e.stopPropagation()} className={styles.detailPanel}>
                     
@@ -185,22 +283,20 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                       </div>
                     )}
 
-                    {/* Detail Grosir Menengah (Renteng) */}
-                    {barang.bisaGrosir && (
-                      <div className={styles.detailRow}>
-                        <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir} Pcs → <strong style={{ color: '#0a8168' }}>Rp {barang.jualGrosir?.toLocaleString('id-ID')}</strong> /pcs
-                      </div>
-                    )}
-
-                    {/* Detail Grosir Besar (Dus) - VERSI SINKRON BELANJA AGEN */}
-                    {barang.bisaGrosirBesar && (
-                      <div className={styles.detailRow}>
-                        <span className={styles.detailLabel}>📦 Grosir Besar ({barang.satuanGrosirBesarNama || 'Dus'}):</span> Isi {barang.minimalBeliGrosirBesar} Pcs → <strong>Rp {barang.jualGrosirBesarTotal?.toLocaleString('id-ID')}</strong> 
-                        <span style={{ color: '#0a8168', fontWeight: '700', fontSize: '0.8rem', marginLeft: '6px' }}>
-                          (Jatuhnya Rp {barang.jualGrosirBesarPerPcs ? Math.round(barang.jualGrosirBesarPerPcs).toLocaleString('id-ID') : Math.round(barang.jualGrosirBesarTotal / (barang.minimalBeliGrosirBesar || 1)).toLocaleString('id-ID')}/pcs)
-                        </span>
-                      </div>
-                    )}
+                    {/* Detail Grosir Menengah + Hitungan Margin Grosir */}
+                    {barang.bisaGrosir && (() => {
+                      const marginGrosir = hitungMarginCuan(barang.modalGrosirTotal, barang.jualGrosirTotal);
+                      return (
+                        <div className={styles.detailRow}>
+                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir} {barang.satuanModal || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {barang.jualGrosirTotal ? barang.jualGrosirTotal.toLocaleString('id-ID') : '0'}</strong>
+                          {Number(marginGrosir) > 0 && (
+                            <span style={{ color: '#0a8168', marginLeft: '6px', fontWeight: 'bold', fontSize: '0.78rem' }}>
+                              (Cuan Grosir: {marginGrosir}%)
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Catatan Manual */}
                     {barang.catatan && (
@@ -216,7 +312,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                   </div>
                 )}
 
-                {/* 🗑️ TOMBOL HAPUS */}
+                {/* TOMBOL HAPUS */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -238,7 +334,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         )}
       </div>
 
-      {/* ── 🚨 POP-UP MODAL ── */}
+      {/* POP-UP MODAL */}
       <ModalBarang 
         key={isModalOpen ? (idBarangAktif || 'tambah_baru') : 'modal_tertutup'}
         isOpen={isModalOpen}
@@ -248,7 +344,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         onSimpan={handleSimpanTerpisah}
       />
 
-      {/* ── 📥 MODAL IMPORT FIRESTORE ── */}
+      {/* MODAL IMPORT FIRESTORE */}
       {isImportModalOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsImportModalOpen(false)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>

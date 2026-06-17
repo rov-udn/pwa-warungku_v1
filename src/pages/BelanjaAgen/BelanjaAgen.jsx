@@ -40,10 +40,15 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
 
   const handleKlikTambah = (barang) => {
     setBarangTerpilih(barang);
-    setSatuanTerpilih(barang.satuanModal || 'Pcs');
     setVarianTerpilih(barang.varian && barang.varian.length > 0 ? barang.varian[0] : ''); 
     setQtyInput(1);
-    setInputHargaModal(barang.modal || 0); 
+
+    // 🎯 LOGIKA BARU: Jadikan Satuan Terbesar Kulakan dari Nota Atas sebagai pilihan Utama Belanja
+    const satuanDefault = barang.satuanTerbesar || 'Dus';
+    const hargaDefault = barang.hargaModalAgen || 0;
+
+    setSatuanTerpilih(satuanDefault);
+    setInputHargaModal(hargaDefault);
     setModalTerbuka(true);
   };
 
@@ -53,7 +58,7 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
     const hargaModalFinal = Number(inputHargaModal);
     
     if (hargaModalFinal !== barangTerpilih.modal) {
-      onUpdateHargaModal(barangTerpilih.id, hargaModalFinal, satuanTerpilih); // 👈 Sudah disinkronkan dengan penambahan parameter satuanBeliAgen di App.jsx
+      onUpdateHargaModal(barangTerpilih.id, hargaModalFinal, satuanTerpilih);
     }
 
     const namaDenganVarian = varianTerpilih ? `${barangTerpilih.nama} (${varianTerpilih})` : barangTerpilih.nama;
@@ -278,7 +283,7 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
         </div>
       )}
 
-      {/* ── 🟢 POP-UP MODAL SELECTION (100% AMAN BEBAS NO-USELESS-ASSIGNMENT) ── */}
+      {/* ── 🟢 POP-UP MODAL SELECTION (🎯 URUTAN PATEN: TANGGA 3 -> TANGGA 2 -> TANGGA 1) ── */}
       {modalTerbuka && barangTerpilih && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
           <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '400px', borderRadius: '14px', padding: '20px', boxSizing: 'border-box', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', color: '#1c1c1e' }}>
@@ -308,37 +313,45 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
               </div>
             )}
 
-            {/* B. Pemilih Satuan Otomatis (AMPUTASI TOTAL LET-VARIABLE MUBASIR) */}
+            {/* B. Pemilih Satuan Otomatis (🎯 MEMBONGKAR TOTAL HALANGAN CHECKBOX LAMA) */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Pilih Satuan Beli Agen:</label>
               {(() => {
                 const options = [];
                 
-                // 1. Eceran
-                options.push({
-                  type: 'eceran',
-                  label: barangTerpilih.satuanModal || 'Pcs',
-                  calculate: () => barangTerpilih.modal || 0
-                });
-
-                // 2. Grosir Menengah
-                if (barangTerpilih.bisaGrosir) {
+                // 1. TANGGA ATAS: Ambil Satuan Terbesar Master Nota Kulakan (Msl: Slop / Dus)
+                if (barangTerpilih.satuanTerbesar) {
                   options.push({
-                    type: 'grosir',
-                    label: barangTerpilih.satuanGrosirNama || 'Renteng',
-                    calculate: () => {
-                      const isiRenteng = Number(barangTerpilih.minimalBeliGrosir) || 10;
-                      return barangTerpilih.jualGrosir ? (barangTerpilih.jualGrosir * isiRenteng) : (barangTerpilih.modal * isiRenteng);
-                    }
+                    type: 'tanggaAtas',
+                    label: barangTerpilih.satuanTerbesar,
+                    calculate: () => barangTerpilih.hargaModalAgen || 0
                   });
                 }
 
-                // 3. Grosir Besar
-                if (barangTerpilih.bisaGrosirBesar) {
+                // 2. TANGGA TENGAH: Ambil Jembatan Eceran Kulakan Pilihan Rofi (Msl: Bungkus / Renteng)
+                if (barangTerpilih.satuanGrosirNama && barangTerpilih.satuanGrosirNama !== barangTerpilih.satuanTerbesar) {
                   options.push({
-                    type: 'grosirBesar',
-                    label: barangTerpilih.satuanGrosirBesarNama || 'Dus',
-                    calculate: () => barangTerpilih.jualGrosirBesarTotal || (barangTerpilih.modal * (barangTerpilih.minimalBeliGrosirBesar || 40))
+                    type: 'tanggaTengah',
+                    label: barangTerpilih.satuanGrosirNama,
+                    calculate: () => barangTerpilih.modalGrosirTotal || (barangTerpilih.modal * 10)
+                  });
+                }
+
+                // 3. TANGGA BAWAH: Ambil Satuan Eceran Terkecil Toko (Msl: Pcs / Kg)
+                if (barangTerpilih.satuanModal && barangTerpilih.satuanModal !== barangTerpilih.satuanGrosirNama && barangTerpilih.satuanModal !== barangTerpilih.satuanTerbesar) {
+                  options.push({
+                    type: 'tanggaBawah',
+                    label: barangTerpilih.satuanModal,
+                    calculate: () => barangTerpilih.modal || 0
+                  });
+                }
+
+                // Pengaman darurat: Jika semua nama satuan kembar atau kosong, tampilkan minimal 1 eceran dasar
+                if (options.length === 0) {
+                  options.push({
+                    type: 'safeFallback',
+                    label: barangTerpilih.satuanModal || 'Pcs',
+                    calculate: () => barangTerpilih.modal || 0
                   });
                 }
 
@@ -380,11 +393,8 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Harga Modal Agen (Bisa Di-edit):</label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', color: '#666', fontSize: '0.9rem', fontWeight: '600' }}>Rp</span>
-                <input type="number" value={inputHargaModal} onChange={(e) => setInputHargaModal(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '6px', border: '1px solid #ced4da', fontSize: '1rem', fontWeight: '700', boxSizing: 'border-box', outline: 'none', backgroundColor: '#f2f2f7', color: Number(inputHargaModal) !== barangTerpilih.modal ? '#d9480f' : '#222' }} />
+                <input type="number" value={inputHargaModal} onChange={(e) => setInputHargaModal(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: '6px', border: '1px solid #ced4da', fontSize: '1rem', fontWeight: '700', boxSizing: 'border-box', outline: 'none', backgroundColor: '#f2f2f7', color: '#222' }} />
               </div>
-              {Number(inputHargaModal) !== barangTerpilih.modal && (
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#d9480f', fontWeight: '600', textAlign: 'left' }}>⚠️ Harga berubah! Otomatis update harga modal di gudang.</p>
-              )}
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
