@@ -17,18 +17,19 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
   // ── 🎯 STATE UTAMA LOGIKA ANTI-RUGI ROFI ──
   const [filterRugiAktif, setFilterRugiAktif] = useState(false);
 
-  // ── 🏷️ DAFTAR KATEGORI UNTUK QUICK FILTER ──
-  const daftarKategori = ['Semua', 'Sembako', 'Rokok', 'Mie Instan', 'Kopi / Minuman', 'Sabun / Sampo', 'Camilan'];
-
-  const dapatkanKategoriBarang = (nama) => {
-    const namaKecil = nama.toLowerCase();
-    if (namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya')) return 'Rokok';
-    if (namaKecil.includes('mie') || namaKecil.includes('indomie') || namaKecil.includes('sedaap') || namaKecil.includes('intermie')) return 'Mie Instan';
-    if (namaKecil.includes('kopi') || namaKecil.includes('kapal api') || namaKecil.includes('teh') || namaKecil.includes('le minerale')) return 'Kopi / Minuman';
-    if (namaKecil.includes('sabun') || namaKecil.includes('sampo') || namaKecil.includes('rinso') || namaKecil.includes('biore')) return 'Sabun / Sampo';
-    if (namaKecil.includes('chiki') || namaKecil.includes('snack') || namaKecil.includes('wafer') || namaKecil.includes('biskuit')) return 'Camilan';
-    return 'Sembako';
-  };
+  // ── 🏷️ DAFTAR KATEGORI ASLI TOKO ROFI (SINKRON DATA FIRESTORE LAMA) ──
+  const daftarKategori = [
+    'Semua', 
+    'Sembako/Dapur', 
+    'Mie/Instan', 
+    'Minuman/Kopi/Susu', 
+    'Rokok/Korek', 
+    'Snack/Biskuit/Roti', 
+    'Sabun/Pembersih', 
+    'Obat-obatan/Medical item', 
+    'plastik/Cup', 
+    'item lain'
+  ];
 
   // ── 🧮 1. LIVE SCANN ANTI-RUGI ──
   const jumlahBarangRugi = useMemo(() => {
@@ -41,12 +42,19 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
     }).length;
   }, [daftarBarang]);
 
-  // ── 🔍 2. FILTER DATA BARANG ──
+  // ── 🔍 2. FILTER DATA BARANG (🎯 MURNI MENEMBAK KATEGORI DATABASE ASLI) ──
+  // ── 🔍 2. FILTER DATA BARANG (🎯 FIX TOTAL: ANTI SENSITIF HURUF BESAR KECIL) ──
   const barangFiltered = useMemo(() => {
     return daftarBarang.filter((barang) => {
       const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
-      const katBarang = dapatkanKategoriBarang(barang.nama);
-      const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
+      
+      // Ambil kategori asli DB, bersihkan dari spasi liar di ujung
+      const katBarang = (barang.kategori || 'item lain').trim();
+      
+      // KUNCI UTAMA: Paksa keduanya jadi huruf kecil total saat dibandingkan!
+      const cocokKategori = 
+        kategoriAktif === 'Semua' || 
+        katBarang.toLowerCase() === kategoriAktif.toLowerCase();
       
       const eceranRugi = Number(barang.jual) < Number(barang.modal);
       const grosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal 
@@ -61,7 +69,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
       return cocokSearch && cocokKategori;
     });
   }, [daftarBarang, searchTerm, kategoriAktif, filterRugiAktif]);
-
+  
   // ── 🧮 3. FUNGSI HITUNG MARGIN UNTUK TAMPILAN LAYAR KASIR ──
   const hitungMarginCuan = (hargaModal, hargaJual) => {
     const modal = Number(hargaModal) || 0;
@@ -220,7 +228,6 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
               : false;
             const apakahRugi = isEceranRugi || isGrosirRugi;
 
-            // Hitung persentase untung eceran
             const marginEceran = hitungMarginCuan(barang.modal, barang.jual);
 
             return (
@@ -233,11 +240,12 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                   backgroundColor: apakahRugi ? 'rgba(255, 59, 48, 0.01)' : 'var(--bg-header, #ffffff)'
                 }}
               >
-                {/* Info Utama Barang (Selalu Terlihat) */}
+                {/* Info Utama Barang */}
                 <div className={styles.cardMainInfo}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    {/* BADGE TEXT: Langsung ambil data properti kategori asli database */}
                     <span className={styles.badgeKategori}>
-                      {dapatkanKategoriBarang(barang.nama)}
+                      {barang.kategori || 'item lain'}
                     </span>
                     
                     {apakahRugi && (
@@ -253,7 +261,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                     <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>Rp {barang.jual?.toLocaleString('id-ID')}</strong>/{barang.satuanJual || 'Pcs'}</span>
                   </div>
 
-                  {/* 🟢 TAMPILAN MARGIN CUAN LANGSUNG DI KARTU UTAMA ── */}
+                  {/* TAMPILAN MARGIN CUAN */}
                   <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
                     {Number(marginEceran) > 0 ? (
                       <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
@@ -270,8 +278,6 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                 {/* PANEL DETAIL MEKAR */}
                 {isTerbuka && (
                   <div onClick={(e) => e.stopPropagation()} className={styles.detailPanel}>
-                    
-                    {/* Detail Varian Rasa */}
                     {barang.varian && barang.varian.length > 0 && (
                       <div className={styles.detailRow}>
                         <span className={styles.detailLabel}>🎨 Varian Rasa:</span>
@@ -283,7 +289,6 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                       </div>
                     )}
 
-                    {/* Detail Grosir Menengah + Hitungan Margin Grosir */}
                     {barang.bisaGrosir && (() => {
                       const marginGrosir = hitungMarginCuan(barang.modalGrosirTotal, barang.jualGrosirTotal);
                       return (
@@ -298,12 +303,10 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                       );
                     })()}
 
-                    {/* Catatan Manual */}
                     {barang.catatan && (
                       <p className={styles.boxCatatan}>📝 {barang.catatan}</p>
                     )}
 
-                    {/* Tombol Aksi Edit Di Dalam Laci */}
                     <div className={styles.actionArea}>
                       <button onClick={() => bukaModalEdit(barang)} className={styles.btnEdit}>
                         ✏️ Edit Data
@@ -344,7 +347,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         onSimpan={handleSimpanTerpisah}
       />
 
-      {/* MODAL IMPORT FIRESTORE */}
+      {/* MODAL IMPORT */}
       {isImportModalOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsImportModalOpen(false)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>

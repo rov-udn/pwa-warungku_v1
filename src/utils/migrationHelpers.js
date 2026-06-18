@@ -30,6 +30,26 @@ export function transformFirestoreDoc(doc, docId, idx) {
 
   const jualGrosirBesarTotal = bisaGrosirBesar ? Math.round(modal * minimalGrosirBesar * 1.05) : null;
 
+  // 🎯 KUNCI AMAN: Normalisasi nama kategori agar pas dengan tab menu aplikasi
+  let kategoriFinal = doc.kategori || 'item lain';
+  if (kategoriLower.includes('medical') || kategoriLower.includes('obat')) {
+    kategoriFinal = 'Obat-obatan/Medical item';
+  } else if (kategoriLower.includes('minuman') || kategoriLower.includes('kopi')) {
+    kategoriFinal = 'Minuman/Kopi/Susu';
+  } else if (kategoriLower.includes('snack') || kategoriLower.includes('roti')) {
+    kategoriFinal = 'Snack/Biskuit/Roti';
+  } else if (kategoriLower.includes('sabun') || kategoriLower.includes('bersih')) {
+    kategoriFinal = 'Sabun/Pembersih';
+  } else if (kategoriLower.includes('plastik') || kategoriLower.includes('cup')) {
+    kategoriFinal = 'plastik/Cup';
+  } else if (kategoriLower.includes('mie')) {
+    kategoriFinal = 'Mie/Instan';
+  } else if (kategoriLower.includes('sembako') || kategoriLower.includes('dapur')) {
+    kategoriFinal = 'Sembako/Dapur';
+  } else if (kategoriLower.includes('rokok') || kategoriLower.includes('korek')) {
+    kategoriFinal = 'Rokok/Korek';
+  }
+
   return {
     id: docId || `${Date.now()}-${idx}`,
     nama: nama,
@@ -49,6 +69,7 @@ export function transformFirestoreDoc(doc, docId, idx) {
     satuanGrosirBesarNama: bisaGrosirBesar ? satuanGrosirBesarNama : '',
     catatan: catatan,
     stok: Number(doc.stok || 0),
+    kategori: kategoriFinal // 🔥 INI DIA KUNCI UTAMANYA, FI! JANGAN SAMPAI KETINGGALAN LAGI!
   };
 }
 

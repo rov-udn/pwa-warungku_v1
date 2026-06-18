@@ -196,47 +196,85 @@ function App() {
     });
   }, []);
 
-  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA
+  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA (🎯 FIXED: SINKRONISASI MODAL DARI DATA RAW & TRANSFORMD)
   const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
     try {
+      const tebakKategoriDariNama = (namaBarang) => {
+        const namaKecil = (namaBarang || '').toLowerCase();
+        if (
+          namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || 
+          namaKecil.includes('surya') || namaKecil.includes('djarum') || namaKecil.includes('samsoet') || 
+          namaKecil.includes('sampoerna') || namaKecil.includes('magnum') || namaKecil.includes('korek') ||
+          namaKecil.includes('gg') || namaKecil.includes('ji sam soe') || namaKecil.includes('bold')
+        ) return 'Rokok/Korek';
+        if (namaKecil.includes('mie') || namaKecil.includes('indomie') || namaKecil.includes('sedaap') || namaKecil.includes('intermie') || namaKecil.includes('sarimi')) return 'Mie/Instan';
+        if (namaKecil.includes('kopi') || namaKecil.includes('kapal api') || namaKecil.includes('teh') || namaKecil.includes('susu') || namaKecil.includes('aqua') || namaKecil.includes('vit')) return 'Minuman/Kopi/Susu';
+        if (namaKecil.includes('sabun') || namaKecil.includes('sampo') || namaKecil.includes('rinso') || namaKecil.includes('biore') || namaKecil.includes('sunlight')) return 'Sabun/Pembersih';
+        if (namaKecil.includes('chiki') || namaKecil.includes('snack') || namaKecil.includes('wafer') || namaKecil.includes('oreo') || namaKecil.includes('roti') || namaKecil.includes('apel')) return 'Snack/Biskuit/Roti';
+        if (namaKecil.includes('promag') || namaKecil.includes('bodrex') || namaKecil.includes('obat') || namaKecil.includes('panadol') || namaKecil.includes('paramex')) return 'Obat-obatan/Medical item';
+        if (namaKecil.includes('plastik') || namaKecil.includes('cup') || namaKecil.includes('gelas') || namaKecil.includes('kantong')) return 'plastik/Cup';
+        if (namaKecil.includes('beras') || namaKecil.includes('gula') || namaKecil.includes('terigu') || namaKecil.includes('minyak') || namaKecil.includes('bumbu')) return 'Sembako/Dapur';
+        return 'item lain';
+      };
+
       const dataHasilKonversi = dataFirestoreLama.map((itemLama) => {
         const namaKecil = (itemLama.nama || '').toLowerCase();
-        const isRokok = namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya') || itemLama.kategori === 'Rokok/Korek';
+        const kategoriAsliAtauNama = itemLama.kategori || itemLama.nama || '';
+        const kategoriLower = kategoriAsliAtauNama.toLowerCase();
         
-        const totalHargaAgen = Number(itemLama.hargaAgen || 0);
-        let minimalGrosirDefault = 10;
-        let minimalGrosirBesarDefault = 40;
+        const isRokok = namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya') || kategoriLower.includes('rokok') || kategoriLower.includes('korek');
+        
+        // ── 🎯 KUNCI UTAMA: DETEKSI NILAI MODAL SECARA AKURAT DARI DATA RAW ATAU TRANSFORMD ──
+        let minimalGrosirBesarDefault = Number(itemLama.minimalBeliGrosirBesar || itemLama.isiSatuan || itemLama.isiPerSatuan || 40);
+        if (minimalGrosirBesarDefault <= 1) minimalGrosirBesarDefault = 40; // pengaman pembagi
 
-        // Tentukan default jumlah per pack berdasarkan satuan pembelian
-        if (namaKecil.includes('promag') && itemLama.satuanBeli === 'Karton') {
-          minimalGrosirBesarDefault = 540;
-        } else if (namaKecil.includes('promag') && ['Slop', 'Pack Besar'].includes(itemLama.satuanBeli)) {
-          minimalGrosirBesarDefault = 12;
-        } else if (['Slop', 'Renteng', 'Pack'].includes(itemLama.satuanBeli)) {
-          minimalGrosirBesarDefault = 10;
-        } else if (['Dus', 'Karton', 'Bal'].includes(itemLama.satuanBeli)) {
-          minimalGrosirBesarDefault = 40;
+        let modalEceranAwal = 0;
+        if (itemLama.modalEceran !== undefined) {
+          // Jalur Data Raw (Neslite: pakai modalEceran langsung murni)
+          modalEceranAwal = Number(itemLama.modalEceran);
+        } else if (itemLama.modal !== undefined) {
+          // Jalur Data Transformed
+          modalEceranAwal = Number(itemLama.modal);
+        } else if (itemLama.hargaAgen !== undefined) {
+          // Jalur Alternatif Data Raw: Harga total Agen / Isi per dus
+          modalEceranAwal = perPieceFromTotal(Number(itemLama.hargaAgen), minimalGrosirBesarDefault);
         }
 
-        // Hitung modal per pcs dari total harga agen bila perlu
-       // ── DISINI AI SUDAH MENGHITUNG MODAL ECERANNYA ──
-        let modalEceranAwal = perPieceFromTotal(totalHargaAgen, minimalGrosirBesarDefault);
-
-        // ── BARIS INI YANG KAMU GANTI/PERBARUI ──
+        // Ambil harga jual eceran murni
         let hargaJualMurni = Number(itemLama.hargaEceran || itemLama.jual || itemLama.hargaJual || 0);
-
         if (hargaJualMurni === 0) {
-          // JALUR DARURAT: Jika data eceran kosong (seperti Aice), markup 15% & bulatkan ke kelipatan Rp 500 terdekat
           const hargaMentah = modalEceranAwal * 1.15;
           hargaJualMurni = Math.ceil(hargaMentah / 500) * 500;
         } else {
-          // JALUR AMAN: Jika hargaEceran dari kamu ada (seperti Djarum Rp 18.000), pakai angka itu bulat murni!
           hargaJualMurni = Math.round(hargaJualMurni);
         }
 
-        let catatanGabungan = '';
-        if (itemLama.catatanUtama || itemLama.catatanHarga) {
-          catatanGabungan = `[Eks App Teks]: ${itemLama.catatanUtama || ''} ${itemLama.catatanHarga || ''}`;
+        let catatanGabungan = itemLama.catatan || '';
+        if (!catatanGabungan && (itemLama.catatanUtama || itemLama.catatanHarga)) {
+          catatanGabungan = [itemLama.catatanUtama || '', itemLama.catatanHarga || ''].filter(Boolean).join(' | ');
+        }
+
+        let minimalGrosirDefault = Number(itemLama.minimalBeliGrosir) || 10;
+        const totalHargaAgen = Number(itemLama.hargaAgen || itemLama.jualGrosirBesarTotal || (modalEceranAwal * minimalGrosirBesarDefault));
+
+        let kategoriFinal = itemLama.kategori || tebakKategoriDariNama(itemLama.nama);
+        const cekLower = kategoriFinal.toLowerCase();
+        if (cekLower.includes('medical') || cekLower.includes('obat')) {
+          kategoriFinal = 'Obat-obatan/Medical item';
+        } else if (cekLower.includes('minuman') || cekLower.includes('kopi') || cekLower.includes('susu')) {
+          kategoriFinal = 'Minuman/Kopi/Susu';
+        } else if (cekLower.includes('snack') || cekLower.includes('roti') || cekLower.includes('biskuit')) {
+          kategoriFinal = 'Snack/Biskuit/Roti';
+        } else if (cekLower.includes('sabun') || cekLower.includes('bersih') || cekLower.includes('pembersih')) {
+          kategoriFinal = 'Sabun/Pembersih';
+        } else if (cekLower.includes('plastik') || cekLower.includes('cup')) {
+          kategoriFinal = 'plastik/Cup';
+        } else if (cekLower.includes('mie') || cekLower.includes('instan')) {
+          kategoriFinal = 'Mie/Instan';
+        } else if (cekLower.includes('sembako') || cekLower.includes('dapur')) {
+          kategoriFinal = 'Sembako/Dapur';
+        } else if (cekLower.includes('rokok') || cekLower.includes('korek')) {
+          kategoriFinal = 'Rokok/Korek';
         }
 
         return {
@@ -244,30 +282,34 @@ function App() {
           nama: itemLama.nama || 'Tanpa Nama',
           modal: modalEceranAwal, 
           jual: hargaJualMurni,   
-          satuanModal: itemLama.satuanBeli || 'Pcs', 
-          satuanJual: 'Pcs', 
+          satuanModal: itemLama.satuanModal || itemLama.satuanBeli || 'Pcs', 
+          satuanJual: itemLama.satuanJual || 'Pcs', 
           varian: itemLama.varian || [],
-          bisaGrosir: true,
+          bisaGrosir: itemLama.bisaGrosir !== undefined ? itemLama.bisaGrosir : true,
           minimalBeliGrosir: minimalGrosirDefault,
-          satuanGrosirNama: isRokok ? 'Slop' : 'Kotak/Renteng',
-          jualGrosir: Math.round(modalEceranAwal * 1.05), 
-          bisaGrosirBesar: !isRokok,
+          satuanGrosirNama: itemLama.satuanGrosirNama || (isRokok ? 'Slop' : 'Kotak/Renteng'),
+          jualGrosir: itemLama.jualGrosir ? Number(itemLama.jualGrosir) : Math.round(modalEceranAwal * 1.05), 
+          bisaGrosirBesar: itemLama.bisaGrosirBesar !== undefined ? itemLama.bisaGrosirBesar : !isRokok,
           minimalBeliGrosirBesar: minimalGrosirBesarDefault,
-          satuanGrosirBesarNama: itemLama.satuanBeli || 'Pack Besar', 
+          satuanGrosirBesarNama: itemLama.satuanGrosirBesarNama || itemLama.satuanBeli || 'Pack Besar', 
           jualGrosirBesarTotal: totalHargaAgen, 
-          jualGrosirBesarPerPcs: perPieceFromTotal(totalHargaAgen, minimalGrosirBesarDefault),
+          jualGrosirBesarPerPcs: Number(itemLama.jualGrosirBesarPerPcs || modalEceranAwal),
           catatan: catatanGabungan,
-          stok: Number(itemLama.stok || 0)
+          stok: Number(itemLama.stok || 0),
+          kategori: kategoriFinal
         };
       });
 
-      setDaftarBarang((prevBarang) => {
-        const idSudahAda = new Set(prevBarang.map(b => b.id));
-        const barangBaruLolosFilter = dataHasilKonversi.filter(b => !idSudahAda.has(b.id));
-        return [...prevBarang, ...barangBaruLolosFilter];
+     // 🎯 URUTKAN BERDASARKAN ABJAD A-Z SEBELUM DISIMPAN
+      const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => {
+        return (a.nama || '').localeCompare(b.nama || '');
       });
 
-      alert(`✅ Berhasil menyelaraskan ${dataHasilKonversi.length} data barang dari Firebase lama!`);
+      // Simpan data yang sudah rapi berurutan dari A-Z
+      setDaftarBarang(dataSudahUrutAZ);
+      localStorage.setItem('warung_daftar_barang', JSON.stringify(dataSudahUrutAZ));
+
+      alert(`✅ Berhasil Sempurna! ${dataSudahUrutAZ.length} barang rapi berurutan A-Z di laci masing-masing!`);
     } catch (error) {
       console.error("Eror konversi data:", error);
       alert("❌ Waduh gagal konversi data, cek log konsol!");
