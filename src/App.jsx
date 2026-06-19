@@ -44,8 +44,6 @@ function App() {
     return Math.round(t / u);
   };
 
-
-
   // ── LOGIKA MUTASI DATA BARANG ──
   const handleTambahBarang = useCallback((barangBaru) => {
     setDaftarBarang((prevBarang) => [
@@ -77,7 +75,6 @@ function App() {
         if (barang.id === idBarang) {
           let modalEceranTerkecil;
 
-          // Jika satuan yang diberikan adalah satuan paket (total), konversi ke harga per pcs
           if (['Dus', 'Karton', 'Bal'].includes(satuanBeliAgen)) {
             const isiPerDus = Number(barang.minimalBeliGrosirBesar) || 40;
             modalEceranTerkecil = perPieceFromTotal(hargaModalBaru, isiPerDus);
@@ -104,13 +101,11 @@ function App() {
       })
     );
 
-    // Jalankan pembaruan log di luar proses map barang utama (mencegah side effect)
     if (logBaruBaru) {
       setLogPerubahanHarga((prevLog) => [logBaruBaru, ...prevLog]);
     }
   }, []);
 
-  // Fungsi pembuat log terpisah supaya bisa dipanggil langsung setelah edit
   const addLogPerubahanHarga = useCallback(({ namaBarang, modalLama, modalBaru }) => {
     if (modalLama === modalBaru) return;
     const entry = {
@@ -125,8 +120,6 @@ function App() {
 
   // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (VERSI SINKRONISASI MASSAL) ──
   const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
-    
-    // 1. UPDATE HISTORY & TOTAL NOTA BARU
     setHistoryBelanja((prevHistory) => {
       const historyUpdate = prevHistory.map((nota) => {
         if (nota.id === idNota) {
@@ -142,26 +135,20 @@ function App() {
       return historyUpdate;
     });
 
-    // 2. ⚡ SINKRONISASI MASSAL KE DATA MASTER GUDANG & BELANJA AGEN
     setDaftarBarang((prevBarang) => {
       const barangUpdate = prevBarang.map((barang) => {
-        // Cari apakah barang ini termasuk yang barusan dikoreksi di dalam nota
         const itemKoreksi = itemsDiperbarui.find(item => item.id === barang.id);
-        
         if (itemKoreksi) {
-          // Ambal nilai modal eceran terkecil hasil pembagian otomatis dari HistoryWarung
           const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
           const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
-
-          // Hitung ulang modal jembatan tengah toko (Modal Eceran Baru x Jumlah Isinya)
           const isiJembatanTengah = Number(barang.minimalBeliGrosir) || 10;
           const modalGrosirMenengahBaru = Number((modalEceranBaru * isiJembatanTengah).toFixed(4));
 
           return {
             ...barang,
-            modal: modalEceranBaru,                // 🍏 Update Modal Eceran Terkecil di Buku Warung!
-            hargaModalAgen: hargaNotaAgenBaru,      // 📥 Update Modal Nota Terbesar di Belanja Agen!
-            modalGrosirTotal: modalGrosirMenengahBaru // ⚙️ Update Modal Jembatan Tengah Toko!
+            modal: modalEceranBaru,
+            hargaModalAgen: hargaNotaAgenBaru,
+            modalGrosirTotal: modalGrosirMenengahBaru
           };
         }
         return barang;
@@ -170,7 +157,6 @@ function App() {
       localStorage.setItem('warung_daftar_barang', JSON.stringify(barangUpdate));
       return barangUpdate;
     });
-
   }, []);
 
   // ── 📅 FUNGSI TAMBAH HISTORY BELANJAAN ──
@@ -196,7 +182,7 @@ function App() {
     });
   }, []);
 
-  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA (🎯 FIXED: SINKRONISASI MODAL DARI DATA RAW & TRANSFORMD)
+  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA (🎯 FIXED: DENGAN LOGIKA UNIT DUS & AUTO-SORT A-Z)
   const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
     try {
       const tebakKategoriDariNama = (namaBarang) => {
@@ -224,23 +210,20 @@ function App() {
         
         const isRokok = namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya') || kategoriLower.includes('rokok') || kategoriLower.includes('korek');
         
-        // ── 🎯 KUNCI UTAMA: DETEKSI NILAI MODAL SECARA AKURAT DARI DATA RAW ATAU TRANSFORMD ──
         let minimalGrosirBesarDefault = Number(itemLama.minimalBeliGrosirBesar || itemLama.isiSatuan || itemLama.isiPerSatuan || 40);
-        if (minimalGrosirBesarDefault <= 1) minimalGrosirBesarDefault = 40; // pengaman pembagi
+        if (minimalGrosirBesarDefault <= 1) minimalGrosirBesarDefault = 40;
 
         let modalEceranAwal = 0;
         if (itemLama.modalEceran !== undefined) {
-          // Jalur Data Raw (Neslite: pakai modalEceran langsung murni)
           modalEceranAwal = Number(itemLama.modalEceran);
         } else if (itemLama.modal !== undefined) {
-          // Jalur Data Transformed
           modalEceranAwal = Number(itemLama.modal);
-        } else if (itemLama.hargaAgen !== undefined) {
-          // Jalur Alternatif Data Raw: Harga total Agen / Isi per dus
-          modalEceranAwal = perPieceFromTotal(Number(itemLama.hargaAgen), minimalGrosirBesarDefault);
+        } else if (itemLama.hargaAgen !== undefined && itemLama.hargaAgen > 0) {
+          modalEceranAwal = Math.round(Number(itemLama.hargaAgen) / minimalGrosirBesarDefault);
         }
 
-        // Ambil harga jual eceran murni
+        const totalHargaAgen = Number(itemLama.hargaAgen || itemLama.jualGrosirBesarTotal || (modalEceranAwal * minimalGrosirBesarDefault));
+
         let hargaJualMurni = Number(itemLama.hargaEceran || itemLama.jual || itemLama.hargaJual || 0);
         if (hargaJualMurni === 0) {
           const hargaMentah = modalEceranAwal * 1.15;
@@ -254,9 +237,10 @@ function App() {
           catatanGabungan = [itemLama.catatanUtama || '', itemLama.catatanHarga || ''].filter(Boolean).join(' | ');
         }
 
-        let minimalGrosirDefault = Number(itemLama.minimalBeliGrosir) || 10;
-        const totalHargaAgen = Number(itemLama.hargaAgen || itemLama.jualGrosirBesarTotal || (modalEceranAwal * minimalGrosirBesarDefault));
-
+        let satuanJualFinal = itemLama.satuanJual || 'Pcs';
+        if (isRokok) {
+          satuanJualFinal = 'Bungkus';
+        }
         let kategoriFinal = itemLama.kategori || tebakKategoriDariNama(itemLama.nama);
         const cekLower = kategoriFinal.toLowerCase();
         if (cekLower.includes('medical') || cekLower.includes('obat')) {
@@ -281,31 +265,32 @@ function App() {
           id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           nama: itemLama.nama || 'Tanpa Nama',
           modal: modalEceranAwal, 
-          jual: hargaJualMurni,   
-          satuanModal: itemLama.satuanModal || itemLama.satuanBeli || 'Pcs', 
-          satuanJual: itemLama.satuanJual || 'Pcs', 
+          hargaModalAgen: totalHargaAgen,         // Rp Agen Terbesar
+          jual: hargaJualMurni,                   // Jual Eceran terkecil
+          satuanModal: itemLama.satuanBeli || itemLama.satuanModal || (isRokok ? 'Slop' : 'Dus'),
+          satuanJual: satuanJualFinal,
+          isiGrosirBesar: minimalGrosirBesarDefault,
           varian: itemLama.varian || [],
-          bisaGrosir: itemLama.bisaGrosir !== undefined ? itemLama.bisaGrosir : true,
-          minimalBeliGrosir: minimalGrosirDefault,
-          satuanGrosirNama: itemLama.satuanGrosirNama || (isRokok ? 'Slop' : 'Kotak/Renteng'),
-          jualGrosir: itemLama.jualGrosir ? Number(itemLama.jualGrosir) : Math.round(modalEceranAwal * 1.05), 
-          bisaGrosirBesar: itemLama.bisaGrosirBesar !== undefined ? itemLama.bisaGrosirBesar : !isRokok,
+          bisaGrosir: true,
+          minimalBeliGrosir: Number(itemLama.minimalBeliGrosir) || 10,
+          satuanGrosirNama: isRokok ? 'Slop' : 'Kotak/Renteng',
+          jualGrosir: Math.round(modalEceranAwal * 1.05),
+          bisaGrosirBesar: !isRokok,
           minimalBeliGrosirBesar: minimalGrosirBesarDefault,
-          satuanGrosirBesarNama: itemLama.satuanGrosirBesarNama || itemLama.satuanBeli || 'Pack Besar', 
-          jualGrosirBesarTotal: totalHargaAgen, 
-          jualGrosirBesarPerPcs: Number(itemLama.jualGrosirBesarPerPcs || modalEceranAwal),
+          satuanGrosirBesarNama: itemLama.satuanBeli || 'Pack Besar',
+          jualGrosirBesarTotal: totalHargaAgen,
+          jualGrosirBesarPerPcs: modalEceranAwal,
           catatan: catatanGabungan,
           stok: Number(itemLama.stok || 0),
           kategori: kategoriFinal
         };
       });
 
-     // 🎯 URUTKAN BERDASARKAN ABJAD A-Z SEBELUM DISIMPAN
+      // 🎯 URUTKAN BERDASARKAN ABJAD A-Z SEBELUM DISIMPAN
       const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => {
         return (a.nama || '').localeCompare(b.nama || '');
       });
 
-      // Simpan data yang sudah rapi berurutan dari A-Z
       setDaftarBarang(dataSudahUrutAZ);
       localStorage.setItem('warung_daftar_barang', JSON.stringify(dataSudahUrutAZ));
 
@@ -320,7 +305,6 @@ function App() {
     return window.innerWidth <= 768 ? 'dashboard' : 'buku-warung';
   });
 
-  // ── 🔥 DETEKTOR LAYAR & SCROLL OPTIMAL ──
   useEffect(() => {
     const handleResize = () => {
       const mobileStatus = window.innerWidth <= 768;
@@ -330,7 +314,6 @@ function App() {
 
     const handleScroll = () => {
       if (window.innerWidth <= 768) {
-        // Hanya update state jika kondisinya berubah (Mencegah re-render liar)
         setIsScrolled(window.scrollY > 30);
       }
     };
@@ -391,7 +374,7 @@ function App() {
     if (activePage === 'buku-warung') {
       return (
         <>
-          <BukuWarung  
+          <BukuWarung   
             daftarBarang={daftarBarang} 
             onTambahBarang={handleTambahBarang}
             onEditBarang={handleEditBarang}
@@ -450,8 +433,6 @@ function App() {
     );
   }, [isMobile, activePage, daftarBarang, historyBelanja, logPerubahanHarga, handleUpdateHargaModal, addLogPerubahanHarga, handleTambahHistoryBelanja, handleTambahBarang, handleEditBarang, handleHapusBarang, handleMigrasiDataFirestore, handleKoreksiNota, handleMenuClick]);
   
-
-  // Memoize main content render to avoid unnecessary recalculation on header timer ticks
   const memoedMainContent = useMemo(() => renderMainContent(), [renderMainContent]);
 
   return (
