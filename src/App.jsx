@@ -6,6 +6,7 @@ import Header from './component/header/Header.jsx';
 import BelanjaAgen from './pages/BelanjaAgen/BelanjaAgen.jsx';
 import HistoryWarung from './pages/History/HistoryWarung.jsx';
 import { initialBarang } from './data/initialBarang.js';
+import RightSidebar from './component/sidebar/RightSidebar.jsx';
 import './global.css'; // 🎯 Pastikan diimport sebagai CSS biasa, bukan module!
 
 function App() {
@@ -480,17 +481,12 @@ function App() {
           {memoedMainContent}
         </div>
       }
-      rightPanel={
-        <div style={!isMobile ? { position: 'fixed', top: '195px', right: 0, width: '300px', height: '100vh', display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px', boxSizing: 'border-box', backgroundColor: '#ffffff', borderLeft: '1px solid #eef0f3' } : { display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', boxSizing: 'border-box' }}>
-          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', border: '1px solid #eef0f3' }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#1a1a1a', fontSize: '0.95rem' }}>Fitur Kanan</h4>
-            <p style={{ fontSize: '0.8rem', color: '#88888b', margin: 0 }}>Log cepat aktif.</p>
-          </div>
-          <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', border: '1px solid #eef0f3', flexGrow: 1 }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#1a1a1a', fontSize: '0.95rem' }}>Informasi Tambahan</h4>
-            <p style={{ fontSize: '0.8rem', color: '#88888b', margin: 0 }}>Ringkasan performa warung hari ini.</p>
-          </div>
-        </div>
+      
+        rightPanel={
+        // 🍏 KUNCI: Jika halaman aktif adalah dashboard, sembunyikan total right panel-nya!
+        activePage === 'dashboard' ? null : (
+          <RightSidebar logPerubahanHarga={logPerubahanHarga} />
+        )
       }
     />
   );

@@ -6,6 +6,8 @@ function RightSidebar({ logPerubahanHarga = [] }) {
   const [modalInput, setModalInput] = useState('');
   const [pcsInput, setPcsInput] = useState('1');
   const [jualInput, setJualInput] = useState('');
+  // 🍏 Tambahkan state untuk memilih jenis satuan agar tidak kaku "Pcs" saja
+  const [satuanHitung, setSatuanHitung] = useState('Pcs');
 
   // ── 📊 REAKTIF HITUNG CUAN & MARGIN ──
   const hasilMargin = useMemo(() => {
@@ -26,7 +28,6 @@ function RightSidebar({ logPerubahanHarga = [] }) {
     };
   }, [modalInput, pcsInput, jualInput]);
 
-  // Ambil maksimal 3 log perubahan harga terbaru untuk radar
   const latestLogs = useMemo(() => {
     return Array.isArray(logPerubahanHarga) ? logPerubahanHarga.slice(0, 3) : [];
   }, [logPerubahanHarga]);
@@ -86,7 +87,7 @@ function RightSidebar({ logPerubahanHarga = [] }) {
           
           {/* Input 1: Harga Modal Total */}
           <div className={styles.inputGroup}>
-            <label className={styles.inputLabel}>Modal Kulakan (Total)</label>
+            <label className={styles.inputLabel}>Modal Kulakan (Total Paket)</label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputPrepend}>Rp</span>
               <input 
@@ -99,9 +100,9 @@ function RightSidebar({ logPerubahanHarga = [] }) {
             </div>
           </div>
 
-          {/* Input 2: Jumlah Pcs */}
+          {/* Input 2: Jumlah Pcs / Isi Paket */}
           <div className={styles.inputGroup}>
-            <label className={styles.inputLabel}>Jumlah Pcs / Isi Paket</label>
+            <label className={styles.inputLabel}>Jumlah Isi per Paket</label>
             <div className={styles.inputWrapper}>
               <input 
                 type="number"
@@ -110,14 +111,23 @@ function RightSidebar({ logPerubahanHarga = [] }) {
                 placeholder="1"
                 min="1"
                 className={`${styles.inputField} ${styles.inputFieldAppended}`}
+                style={{ width: '50%' }}
               />
-              <span className={styles.inputAppend}>Pcs</span>
+              {/* 🍏 Dropdown dinamis pengganti teks append mati */}
+              <select 
+                value={satuanHitung} 
+                onChange={(e) => setSatuanHitung(e.target.value)}
+                className={styles.inputAppend}
+                style={{ width: '50%', border: 'none', background: 'none', fontWeight: '700', cursor: 'pointer', outline: 'none' }}
+              >
+                {['Pcs', 'Kg', 'Bungkus', 'Sachet', 'Liter'].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
           </div>
 
           {/* Input 3: Rencana Jual Eceran */}
           <div className={styles.inputGroup}>
-            <label className={styles.inputLabel}>Rencana Jual (per Pcs)</label>
+            <label className={styles.inputLabel}>Rencana Jual (per {satuanHitung})</label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputPrepend}>Rp</span>
               <input 
@@ -133,11 +143,11 @@ function RightSidebar({ logPerubahanHarga = [] }) {
           {/* Kotak Hasil Reaktif */}
           <div className={styles.resultsBox}>
             <div className={styles.resultRow}>
-              <span className={styles.resultLabel}>Modal per Pcs:</span>
+              <span className={styles.resultLabel}>Modal per {satuanHitung}:</span>
               <span className={styles.resultValue}>Rp {hasilMargin.modalPerPcs.toLocaleString('id-ID')}</span>
             </div>
             <div className={styles.resultRow}>
-              <span className={styles.resultLabel}>Untung per Pcs:</span>
+              <span className={styles.resultLabel}>Untung per {satuanHitung}:</span>
               <span className={styles.resultValue} style={{ color: hasilMargin.untungPerPcs >= 0 ? 'var(--accent-emerald, #0a8168)' : '#d9480f' }}>
                 Rp {hasilMargin.untungPerPcs.toLocaleString('id-ID')}
               </span>
