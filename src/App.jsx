@@ -182,7 +182,7 @@ function App() {
     });
   }, []);
 
-  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA (🎯 FIXED: DENGAN LOGIKA UNIT DUS & AUTO-SORT A-Z)
+  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA (🎯 FIXED: DENGAN LOGIKA UNIT DUS/KG & AUTO-SORT A-Z)
   const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
     try {
       const tebakKategoriDariNama = (namaBarang) => {
@@ -199,7 +199,7 @@ function App() {
         if (namaKecil.includes('chiki') || namaKecil.includes('snack') || namaKecil.includes('wafer') || namaKecil.includes('oreo') || namaKecil.includes('roti') || namaKecil.includes('apel')) return 'Snack/Biskuit/Roti';
         if (namaKecil.includes('promag') || namaKecil.includes('bodrex') || namaKecil.includes('obat') || namaKecil.includes('panadol') || namaKecil.includes('paramex')) return 'Obat-obatan/Medical item';
         if (namaKecil.includes('plastik') || namaKecil.includes('cup') || namaKecil.includes('gelas') || namaKecil.includes('kantong')) return 'plastik/Cup';
-        if (namaKecil.includes('beras') || namaKecil.includes('gula') || namaKecil.includes('terigu') || namaKecil.includes('minyak') || namaKecil.includes('bumbu')) return 'Sembako/Dapur';
+        if (namaKecil.includes('beras') || namaKecil.includes('gula') || namaKecil.includes('terigu') || namaKecil.includes('minyak') || namaKecil.includes('bumbu') || namaKecil.includes('aci')) return 'Sembako/Dapur';
         return 'item lain';
       };
 
@@ -209,9 +209,10 @@ function App() {
         const kategoriLower = kategoriAsliAtauNama.toLowerCase();
         
         const isRokok = namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya') || kategoriLower.includes('rokok') || kategoriLower.includes('korek');
-        
-        let minimalGrosirBesarDefault = Number(itemLama.minimalBeliGrosirBesar || itemLama.isiSatuan || itemLama.isiPerSatuan || 40);
-        if (minimalGrosirBesarDefault <= 1) minimalGrosirBesarDefault = 40;
+        const isSembakoCurah = namaKecil.includes('beras') || namaKecil.includes('gula') || namaKecil.includes('terigu') || namaKecil.includes('aci') || namaKecil.includes('gunung');
+
+        let minimalGrosirBesarDefault = Number(itemLama.minimalBeliGrosirBesar || itemLama.isiSatuan || itemLama.isiPerSatuan || (isSembakoCurah ? 25 : 40));
+        if (minimalGrosirBesarDefault <= 1) minimalGrosirBesarDefault = isSembakoCurah ? 25 : 40;
 
         let modalEceranAwal = 0;
         if (itemLama.modalEceran !== undefined) {
@@ -237,10 +238,9 @@ function App() {
           catatanGabungan = [itemLama.catatanUtama || '', itemLama.catatanHarga || ''].filter(Boolean).join(' | ');
         }
 
-        let satuanJualFinal = itemLama.satuanJual || 'Pcs';
-        if (isRokok) {
-          satuanJualFinal = 'Bungkus';
-        }
+        let satuanModalFinal = itemLama.satuanBeli || itemLama.satuanModal || (isRokok ? 'Slop' : isSembakoCurah ? 'Karung/Sak' : 'Dus');
+        let satuanJualFinal = itemLama.satuanJual || (isRokok ? 'Bungkus' : isSembakoCurah ? 'Kg' : 'Pcs');
+
         let kategoriFinal = itemLama.kategori || tebakKategoriDariNama(itemLama.nama);
         const cekLower = kategoriFinal.toLowerCase();
         if (cekLower.includes('medical') || cekLower.includes('obat')) {
@@ -265,9 +265,9 @@ function App() {
           id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           nama: itemLama.nama || 'Tanpa Nama',
           modal: modalEceranAwal, 
-          hargaModalAgen: totalHargaAgen,         // Rp Agen Terbesar
+          hargaModalAgen: totalHargaAgen,         // Rp Agen Terbesar (M:)
           jual: hargaJualMurni,                   // Jual Eceran terkecil
-          satuanModal: itemLama.satuanBeli || itemLama.satuanModal || (isRokok ? 'Slop' : 'Dus'),
+          satuanModal: satuanModalFinal,
           satuanJual: satuanJualFinal,
           isiGrosirBesar: minimalGrosirBesarDefault,
           varian: itemLama.varian || [],
@@ -277,7 +277,7 @@ function App() {
           jualGrosir: Math.round(modalEceranAwal * 1.05),
           bisaGrosirBesar: !isRokok,
           minimalBeliGrosirBesar: minimalGrosirBesarDefault,
-          satuanGrosirBesarNama: itemLama.satuanBeli || 'Pack Besar',
+          satuanGrosirBesarNama: satuanModalFinal,
           jualGrosirBesarTotal: totalHargaAgen,
           jualGrosirBesarPerPcs: modalEceranAwal,
           catatan: catatanGabungan,
