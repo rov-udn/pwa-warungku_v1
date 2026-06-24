@@ -156,7 +156,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
                 <div className={styles.rowGrid}>
                   <input type="number" value={jumlahKonversiGrosir} onChange={(e) => setJumlahKonversiGrosir(e.target.value)} placeholder="10" className={styles.boxInput} style={{ width: '45%', borderRadius: '8px 0 0 8px', borderRight: 'none', textAlign: 'center' }} />
                   <select value={satuanGrosirNama} onChange={(e) => setSatuanGrosirNama(e.target.value)} className={styles.boxInput} style={{ width: '55%', borderRadius: '0 8px 8px 0', fontWeight: '600' }}>
-                    {['Renteng', 'Slop', 'Pak Kecil', 'Pack', 'Bungkus', 'Lempeng', 'Kg', 'rcg'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['Renteng', 'Slop', 'Pak Kecil', 'Pack', 'Bungkus', 'Lempeng', 'Kg', 'rcg', 'pcs'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
