@@ -28,8 +28,10 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
     'item lain'
   ];
 
+  // ── 🎯 LOGIKA FILTER RUGI HANYA BERLAKU JIKA HARGA SUDAH DIISI ──
   const jumlahBarangRugi = useMemo(() => {
     return daftarBarang.filter(barang => {
+      if (!barang.jual || !barang.hargaModalAgen) return false; // Abaikan yang masih kosong baru migrasi
       const eceranRugi = Number(barang.jual) < Number(barang.modal);
       const grosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal 
         ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
@@ -48,7 +50,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
       const grosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal 
         ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
         : false;
-      const apakahRugi = eceranRugi || grosirRugi;
+      const apakahRugi = (barang.jual && barang.hargaModalAgen) && (eceranRugi || grosirRugi);
 
       if (filterRugiAktif) {
         return cocokSearch && cocokKategori && apakahRugi;
@@ -150,9 +152,14 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         {barangFiltered.length > 0 ? (
           barangFiltered.map((barang) => {
             const isTerbuka = idCardTerbuka === barang.id;
-            const isEceranRugi = Number(barang.jual) < Number(barang.modal);
+            
+            // Logika Rugi hanya aktif jika data harga sudah di-input manual
+            const isEceranRugi = barang.jual && barang.modal ? Number(barang.jual) < Number(barang.modal) : false;
             const isGrosirRugi = barang.jualGrosirTotal && barang.modalGrosirTotal ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) : false;
             const apakahRugi = isEceranRugi || isGrosirRugi;
+
+            const namaSatuanTerbesar = barang.satuanTerbesar || 'Dus';
+            const hargaNotaTerbesar = Number(barang.hargaModalAgen) || 0;
 
             return (
               <div key={barang.id} onClick={() => setIdCardTerbuka(isTerbuka ? null : barang.id)} className={styles.cardItem} style={{ border: apakahRugi ? '1px solid rgba(255, 59, 48, 0.45)' : '1px solid var(--border-color, #eef0f3)', backgroundColor: apakahRugi ? 'rgba(255, 59, 48, 0.01)' : 'var(--bg-header, #ffffff)' }}>
@@ -164,24 +171,26 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
 
                   <h4 className={styles.barangNama}>{barang.nama}</h4>
                   
-                  {/* ── 🎯 DISPLAY HARGA: M (AGEN TERBESAR) VS JUAL (ECERAN TERKECIL) ── */}
+                  {/* ── 🎯 DISPLAY HARGA BERSIH COCOK UNTUK DATA BARU / KOSONG ── */}
                   <div className={styles.priceGrid}>
-                    <span>M: <strong style={{ color: 'var(--text-main)' }}>Rp {(barang.hargaModalAgen || barang.hargaAgen || 0).toLocaleString('id-ID')}</strong>/{barang.satuanTerbesar || barang.satuanModal || 'Dus'}</span>
-                    <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>Rp {barang.jual?.toLocaleString('id-ID')}</strong>/{barang.satuanJual || 'Pcs'}</span>
+                    <span>M: <strong style={{ color: 'var(--text-main)' }}>{hargaNotaTerbesar > 0 ? `Rp ${hargaNotaTerbesar.toLocaleString('id-ID')}` : 'Belum Set'}</strong>/{namaSatuanTerbesar}</span>
+                    <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>{barang.jual ? `Rp ${Number(barang.jual).toLocaleString('id-ID')}` : 'Belum Set'}</strong>/{barang.satuanJual || 'Pcs'}</span>
                   </div>
 
-                  {/* ── 🎯 LOGIKA HITUNG MARGIN UNTUNG ADIL PER UNIT BESAR ── */}
+                  {/* ── 🎯 LOGIKA HITUNG MARGIN (HANYA MUNCUL KALAU HARGA SUDAH DIISI) ── */}
                   <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
                     {(() => {
-                      const totalIsiPaket = Number(barang.isiKeEceran || barang.isiGrosirBesar || 40);
-                      const totalOmsetPerUnitBesar = (barang.jual || 0) * totalIsiPaket;
-                      const totalModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen || 0);
-                      
-                      const untungRupiahPerUnitBesar = totalOmsetPerUnitBesar - totalModalAgen;
+                      if (!barang.jual || !barang.hargaModalAgen) {
+                        return <span style={{ color: '#8e8e93', backgroundColor: '#f2f2f7', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>⚙️ Klik "Edit Data" Untuk Mengisi Harga</span>;
+                      }
+
+                      const totalIsiPaket = Number(barang.isiKeEceran || 40);
+                      const totalOmsetPerUnitBesar = Number(barang.jual) * totalIsiPaket;
+                      const untungRupiahPerUnitBesar = totalOmsetPerUnitBesar - hargaNotaTerbesar;
                       const persenMargin = totalOmsetPerUnitBesar > 0 ? ((untungRupiahPerUnitBesar / totalOmsetPerUnitBesar) * 100).toFixed(1) : 0;
 
                       return untungRupiahPerUnitBesar > 0 ? (
-                        <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {barang.satuanTerbesar || barang.satuanModal || 'Dus'})</span>
+                        <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {namaSatuanTerbesar})</span>
                       ) : (
                         <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>🛑 Jual Rugi: Selisih Rp {Math.abs(untungRupiahPerUnitBesar).toLocaleString('id-ID')}</span>
                       );
@@ -200,11 +209,11 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                       </div>
                     )}
 
-                    {barang.bisaGrosir && (() => {
+                    {barang.bisaGrosir && barang.jualGrosirTotal && (() => {
                       const marginGrosir = hitungMarginCuan(barang.modalGrosirTotal, barang.jualGrosirTotal);
                       return (
                         <div className={styles.detailRow}>
-                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir} {barang.satuanJual || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {barang.jualGrosirTotal ? barang.jualGrosirTotal.toLocaleString('id-ID') : '0'}</strong>
+                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir} {barang.satuanJual || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {Number(barang.jualGrosirTotal).toLocaleString('id-ID')}</strong>
                           {Number(marginGrosir) > 0 && <span style={{ color: '#0a8168', marginLeft: '6px', fontWeight: 'bold', fontSize: '0.78rem' }}>(Cuan Grosir: {marginGrosir}%)</span>}
                         </div>
                       );
@@ -226,10 +235,18 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
           <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, Fi. 🧐</div>
         )}
       </div>
-{/* POP-UP MODAL FORM EDIT / TAMBAH */}
-      <ModalBarang key={isModalOpen ? (idBarangAktif || 'tambah_baru') : 'modal_tertutup'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} modalMode={modalMode} barangAktif={barangAktif} onSimpan={handleSimpanTerpisah} />
 
-      {/* 📥 🎯 POP-UP MODAL IMPORT MIGRASI FIRESTORE (Menghilangkan warning ESLint) */}
+      {/* POP-UP MODAL FORM EDIT / TAMBAH */}
+      <ModalBarang 
+        key={barangAktif?.id || 'tambah-baru'} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        modalMode={modalMode} 
+        barangAktif={barangAktif} 
+        onSimpan={handleSimpanTerpisah} 
+      />
+
+      {/* 📥 POP-UP MODAL IMPORT MIGRASI FIRESTORE */}
       {isImportModalOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsImportModalOpen(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '16px', boxSizing: 'border-box' }}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-header, #ffffff)', width: '100%', maxWidth: '440px', borderRadius: '16px', padding: '20px', boxSizing: 'border-box', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>

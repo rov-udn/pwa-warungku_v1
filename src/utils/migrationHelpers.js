@@ -2,35 +2,21 @@
  * Migration utilities untuk Firestore → App
  */
 
-// Transform logic (inline dari transform_firestore_to_app.js)
-function guessMinimalBeliGrosirBesar(satuanBeli) {
-  const unit = (satuanBeli || '').toLowerCase();
-  if (unit.includes('slop') || unit.includes('pak kecil')) return 12;
-  if (unit.includes('karton') || unit.includes('bal')) return 40;
-  return 40;
-}
-
-function guessHargaJual(modal) {
-  return Math.round(modal * 1.15);
-}
+// ── 🍏 FUNGSI TEBAKAN HARGA LAMA SUDAH DIHAPUS AGAR LOLOS ESLINT ──
 
 export function transformFirestoreDoc(doc, docId, idx) {
-  const modal = Number(doc.hargaAgen || 0);
+  // 🎯 AMAN ESLINT: Langsung ambil data non-harga yang dibutuhkan saja
   const nama = doc.nama || `Item ${idx + 1}`;
   const kategoriLower = (doc.kategori || '').toLowerCase();
-
-  const bisaGrosir = kategoriLower.includes('rokok') || kategoriLower.includes('snack') || kategoriLower.includes('mie') || kategoriLower.includes('biskit');
-  const bisaGrosirBesar = !kategoriLower.includes('rokok');
-
   const catatan = [doc.catatanUtama || '', doc.catatanHarga || ''].filter(Boolean).join(' | ');
 
+  // Mengatur logika grosir dasar bawaan
+  const bisaGrosir = kategoriLower.includes('rokok') || kategoriLower.includes('snack') || kategoriLower.includes('mie') || kategoriLower.includes('biskit');
+  const bisaGrosirBesar = !kategoriLower.includes('rokok');
   const satuanBeliLower = (doc.satuanBeli || '').toLowerCase();
-  const minimalGrosirBesar = guessMinimalBeliGrosirBesar(satuanBeliLower);
   const satuanGrosirBesarNama = satuanBeliLower.includes('slop') ? 'Bal' : (satuanBeliLower.includes('pack') ? 'Dus' : 'Dus');
 
-  const jualGrosirBesarTotal = bisaGrosirBesar ? Math.round(modal * minimalGrosirBesar * 1.05) : null;
-
-  // 🎯 KUNCI AMAN: Normalisasi nama kategori agar pas dengan tab menu aplikasi
+  // ── 🎯 NORMALISASI KATEGORI ──
   let kategoriFinal = doc.kategori || 'item lain';
   if (kategoriLower.includes('medical') || kategoriLower.includes('obat')) {
     kategoriFinal = 'Obat-obatan/Medical item';
@@ -53,23 +39,32 @@ export function transformFirestoreDoc(doc, docId, idx) {
   return {
     id: docId || `${Date.now()}-${idx}`,
     nama: nama,
-    modal: modal,
-    jual: guessHargaJual(modal),
+    
+    // ── 🎯 TARGET RESET: Semua nominal diset kosong/null agar status otomatis "Belum Set" ──
+    modal: '',            // Kosong agar dibaca sebagai string kosong di state
+    hargaModalAgen: '',   
+    jual: '',             
+    hargaEceran: '',      
+    
     satuanModal: (doc.satuanBeli || 'Pcs').charAt(0).toUpperCase() + (doc.satuanBeli || 'Pcs').slice(1).toLowerCase(),
     satuanJual: 'Pcs',
     varian: [],
+    
+    // Logika grosir di-reset nominalnya, tapi strukturnya tetap aktif agar siap diisi
     bisaGrosir: bisaGrosir,
     minimalBeliGrosir: bisaGrosir ? 10 : null,
-    jualGrosir: bisaGrosir ? Math.round(modal * 1.05) : null,
+    jualGrosir: null,
     satuanGrosirNama: bisaGrosir ? 'Renteng' : '',
+    
     bisaGrosirBesar: bisaGrosirBesar,
-    minimalBeliGrosirBesar: bisaGrosirBesar ? minimalGrosirBesar : null,
-    jualGrosirBesarTotal: jualGrosirBesarTotal,
-    jualGrosirBesarPerPcs: jualGrosirBesarTotal ? Math.round(jualGrosirBesarTotal / minimalGrosirBesar) : null,
+    minimalBeliGrosirBesar: bisaGrosirBesar ? (satuanBeliLower.includes('slop') || satuanBeliLower.includes('pak kecil') ? 12 : 40) : null,
+    jualGrosirBesarTotal: null,
+    jualGrosirBesarPerPcs: null,
     satuanGrosirBesarNama: bisaGrosirBesar ? satuanGrosirBesarNama : '',
+    
     catatan: catatan,
     stok: Number(doc.stok || 0),
-    kategori: kategoriFinal // 🔥 INI DIA KUNCI UTAMANYA, FI! JANGAN SAMPAI KETINGGALAN LAGI!
+    kategori: kategoriFinal
   };
 }
 

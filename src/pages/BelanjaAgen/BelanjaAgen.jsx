@@ -5,11 +5,9 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
   const [searchTerm, setSearchTerm] = useState('');
   const [kategoriAktif, setKategoriAktif] = useState('Semua'); 
   const [keranjang, setKeranjang] = useState([]);
-  
-  // ── 📱 SAKLAR NAVIGASI UTAMA (PILIH BARANG / KERANJANG) ──
   const [tabAktif, setTabAktif] = useState('pilih'); 
 
-  // State untuk Modal Pemilih Kriteria (Satuan, Varian, Qty, Harga)
+  // State untuk Modal Pemilih Kriteria
   const [modalTerbuka, setModalTerbuka] = useState(false);
   const [barangTerpilih, setBarangTerpilih] = useState(null);
   const [satuanTerpilih, setSatuanTerpilih] = useState('');
@@ -17,23 +15,19 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
   const [qtyInput, setQtyInput] = useState(1);
   const [inputHargaModal, setInputHargaModal] = useState('');
 
-  const daftarKategori = ['Semua', 'Sembako', 'Rokok', 'Mie Instan', 'Kopi / Minuman', 'Sabun / Sampo', 'Camilan'];
+  // ── 🟢 KATEGORI DIKUNCI SESUAI DATABASE BUKU WARUNG KAMU ──
+  const daftarKategori = ['Semua', 'Sembako/Dapur', 'Mie/Instan', 'Minuman/Kopi/Susu', 'Rokok/Korek', 'Snack/Biskuit/Roti', 'Sabun/Pembersih', 'Obat-obatan/Medical item', 'plastik/Cup', 'item lain'];
 
-  const dapatkanKategoriBarang = (nama) => {
-    const namaKecil = nama.toLowerCase();
-    if (namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya')) return 'Rokok';
-    if (namaKecil.includes('mie') || namaKecil.includes('indomie') || namaKecil.includes('sedaap') || namaKecil.includes('intermie')) return 'Mie Instan';
-    if (namaKecil.includes('kopi') || namaKecil.includes('kapal api') || namaKecil.includes('teh') || namaKecil.includes('le minerale')) return 'Kopi / Minuman';
-    if (namaKecil.includes('sabun') || namaKecil.includes('sampo') || namaKecil.includes('rinso') || namaKecil.includes('biore')) return 'Sabun / Sampo';
-    if (namaKecil.includes('chiki') || namaKecil.includes('snack') || namaKecil.includes('wafer') || namaKecil.includes('biskuit')) return 'Camilan';
-    return 'Sembako';
-  };
-
+  // ── 🎯 FIX FILTER KATEGORI AMAN 100% ──
   const barangFiltered = useMemo(() => {
     return daftarBarang.filter((barang) => {
       const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
-      const katBarang = dapatkanKategoriBarang(barang.nama);
-      const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
+      
+      // Ambil properti kategori dari barang, lowercase-kan untuk membandingkan
+      const katBarang = (barang.kategori || 'item lain').trim().toLowerCase();
+      const katAktifLower = kategoriAktif.toLowerCase();
+      
+      const cocokKategori = kategoriAktif === 'Semua' || katBarang === katAktifLower;
       return cocokSearch && cocokKategori;
     });
   }, [daftarBarang, searchTerm, kategoriAktif]);
@@ -43,9 +37,9 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
     setVarianTerpilih(barang.varian && barang.varian.length > 0 ? barang.varian[0] : ''); 
     setQtyInput(1);
 
-    // 🎯 LOGIKA BARU: Jadikan Satuan Terbesar Kulakan dari Nota Atas sebagai pilihan Utama Belanja
-    const satuanDefault = barang.satuanTerbesar || 'Dus';
-    const hargaDefault = barang.hargaModalAgen || 0;
+    // 🎯 FIX MUTLAK: Membaca properti data raw lama milik Rofi
+    const satuanDefault = barang.satuanBeli || barang.satuanModal || 'Dus';
+    const hargaDefault = barang.hargaAgen || barang.hargaModalAgen || 0;
 
     setSatuanTerpilih(satuanDefault);
     setInputHargaModal(hargaDefault);
@@ -57,7 +51,8 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
 
     const hargaModalFinal = Number(inputHargaModal);
     
-    if (hargaModalFinal !== barangTerpilih.modal) {
+    // Opsional: Update harga modal di database utama jika diubah di keranjang
+    if (typeof onUpdateHargaModal === 'function' && hargaModalFinal !== (barangTerpilih.hargaModalAgen || barangTerpilih.hargaAgen)) {
       onUpdateHargaModal(barangTerpilih.id, hargaModalFinal, satuanTerpilih);
     }
 
@@ -119,12 +114,13 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
     teksNota += `*DAFTAR PESANAN KULAKAN:*\n\n`;
 
     keranjang.forEach((item, index) => {
-      const kat = dapatkanKategoriBarang(item.nama).toUpperCase();
-      teksNota += `${index + 1}. *[${kat}]* ${item.nama}\n`;
-      teksNota += `   👉 Isi: *${item.qty} ${item.satuanModal}*\n\n`;
+      teksNota += `${index + 1}. ${item.nama}\n`;
+      teksNota += `   👉 Kuantitas: *${item.qty} ${item.satuanModal}*\n`;
+      teksNota += `   👉 Est. Modal: Rp ${(item.modalBaru).toLocaleString('id-ID')} / ${item.satuanModal}\n\n`;
     });
     
     teksNota += `--------------------------------\n`;
+    teksNota += `*Total Estimasi Pengeluaran:* Rp ${hitungTotalEstimasi().toLocaleString('id-ID')}\n\n`;
     teksNota += `_Mohon disiapkan ya Ko/Cik, terima kasih!_ 🙏`;
 
     if (navigator.share) {
@@ -134,7 +130,9 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
       alert("📋 Daftar pesanan sudah dicopy ke HP, Fi!");
     }
 
-    onTambahHistoryBelanja(keranjang);
+    if (typeof onTambahHistoryBelanja === 'function') {
+      onTambahHistoryBelanja(keranjang);
+    }
     setKeranjang([]);
     setTabAktif('pilih'); 
   };
@@ -195,18 +193,18 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
             })}
           </div>
 
-          <h3 className={styles.sectionTitle || ''} style={{ fontSize: '0.95rem', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main, #1c1c1e)', textAlign: 'left' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main, #1c1c1e)', textAlign: 'left' }}>
             Pilih Barang Toko
           </h3>
           <div className={styles.gridBarang}>
             {barangFiltered.length === 0 ? (
-              <div className={styles.textKosong || ''} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, Fi. 🧐</div>
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, Fi. 🧐</div>
             ) : (
               barangFiltered.map((barang) => (
                 <div key={barang.id} onClick={() => handleKlikTambah(barang)} className={styles.cardPilihItem}>
                   <div className={styles.infoKiri}>
                     <h4>{barang.nama}</h4>
-                    <span>M: Rp {(barang.modal || 0).toLocaleString('id-ID')} / {barang.satuanModal || 'Pcs'}</span>
+                    <span>M: Rp {(barang.hargaModalAgen || barang.hargaAgen || 0).toLocaleString('id-ID')} / {barang.satuanModal || 'Dus'}</span>
                   </div>
                   <div className={styles.indicatorPilih}>
                     + Keranjang
@@ -222,7 +220,7 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
       {(tabAktif === 'get_keranjang' || tabAktif === 'keranjang') && (
         <div>
           {keranjang.length === 0 ? (
-            <div className={styles.textKosong || ''} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
               <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '10px' }}>🛒</span>
               <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-main)' }}>Keranjang kulakan kosong, Fi!</p>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem' }}>Silakan kembali ke tab pilih barang terlebih dahulu.</p>
@@ -232,7 +230,6 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
               <div>
                 {keranjang.map((item) => (
                   <div key={item.idUnik} className={styles.itemBelanja}>
-                    
                     <div className={styles.infoNama}>
                       <p className={styles.namaBarang}>{item.nama}</p>
                     </div>
@@ -283,7 +280,7 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
         </div>
       )}
 
-      {/* ── 🟢 POP-UP MODAL SELECTION (🎯 URUTAN PATEN: TANGGA 3 -> TANGGA 2 -> TANGGA 1) ── */}
+      {/* ── 🟢 POP-UP MODAL SELECTION ── */}
       {modalTerbuka && barangTerpilih && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
           <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '400px', borderRadius: '14px', padding: '20px', boxSizing: 'border-box', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', color: '#1c1c1e' }}>
@@ -313,45 +310,36 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
               </div>
             )}
 
-            {/* B. Pemilih Satuan Otomatis (🎯 MEMBONGKAR TOTAL HALANGAN CHECKBOX LAMA) */}
+            {/* B. Pemilih Satuan Otomatis */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#444', marginBottom: '6px', textAlign: 'left' }}>Pilih Satuan Beli Agen:</label>
               {(() => {
                 const options = [];
                 
-                // 1. TANGGA ATAS: Ambil Satuan Terbesar Master Nota Kulakan (Msl: Slop / Dus)
-                if (barangTerpilih.satuanTerbesar) {
-                  options.push({
-                    type: 'tanggaAtas',
-                    label: barangTerpilih.satuanTerbesar,
-                    calculate: () => barangTerpilih.hargaModalAgen || 0
-                  });
-                }
+                // 1. TANGGA ATAS: Mengambil Satuan Modal Terbesar (Dus/Karung/Slop)
+                const unitBesar = barangTerpilih.satuanModal || barangTerpilih.satuanTerbesar || 'Dus';
+                options.push({
+                  type: 'tanggaAtas',
+                  label: unitBesar,
+                  calculate: () => barangTerpilih.hargaModalAgen || barangTerpilih.hargaAgen || 0
+                });
 
-                // 2. TANGGA TENGAH: Ambil Jembatan Eceran Kulakan Pilihan Rofi (Msl: Bungkus / Renteng)
-                if (barangTerpilih.satuanGrosirNama && barangTerpilih.satuanGrosirNama !== barangTerpilih.satuanTerbesar) {
+                // 2. TANGGA TENGAH: Mengambil Jembatan Menengah Kulakan (Renteng/Bungkus)
+                if (barangTerpilih.satuanGrosirNama && barangTerpilih.satuanGrosirNama !== unitBesar) {
                   options.push({
                     type: 'tanggaTengah',
                     label: barangTerpilih.satuanGrosirNama,
-                    calculate: () => barangTerpilih.modalGrosirTotal || (barangTerpilih.modal * 10)
+                    calculate: () => barangTerpilih.modalGrosirTotal || ((barangTerpilih.modal || 0) * (barangTerpilih.minimalBeliGrosir || 10))
                   });
                 }
 
-                // 3. TANGGA BAWAH: Ambil Satuan Eceran Terkecil Toko (Msl: Pcs / Kg)
-                if (barangTerpilih.satuanModal && barangTerpilih.satuanModal !== barangTerpilih.satuanGrosirNama && barangTerpilih.satuanModal !== barangTerpilih.satuanTerbesar) {
+                // 3. TANGGA BAWAH: Mengambil Satuan Eceran Terkecil Toko (Pcs/Kg)
+                const unitKecil = barangTerpilih.satuanJual || 'Pcs';
+                if (unitKecil !== unitBesar && unitKecil !== barangTerpilih.satuanGrosirNama) {
                   options.push({
                     type: 'tanggaBawah',
-                    label: barangTerpilih.satuanModal,
-                    calculate: () => barangTerpilih.modal || 0
-                  });
-                }
-
-                // Pengaman darurat: Jika semua nama satuan kembar atau kosong, tampilkan minimal 1 eceran dasar
-                if (options.length === 0) {
-                  options.push({
-                    type: 'safeFallback',
-                    label: barangTerpilih.satuanModal || 'Pcs',
-                    calculate: () => barangTerpilih.modal || 0
+                    label: unitKecil,
+                    calculate: () => Math.round(barangTerpilih.modal || 0)
                   });
                 }
 

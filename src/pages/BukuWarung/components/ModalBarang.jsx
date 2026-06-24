@@ -4,21 +4,23 @@ import { createPortal } from 'react-dom';
 function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const isEdit = modalMode === 'edit' && barangAktif;
 
-  // ── 🍏 1. NAMA & VARIAN BARANG ──
+  // ── 🍏 1. NAMA, KATEGORI & VARIAN BARANG ──
   const [nama, setNama] = useState(isEdit ? (barangAktif.nama || '') : '');
-  const [catatan, setCatatan] = useState(isEdit ? (barangAktif.catatan || '') : '');
+  // 🎯 TAMBAHAN: State untuk menampung Kategori agar bisa diedit
+  const [kategori, setKategori] = useState(isEdit ? (barangAktif.kategori || 'item lain') : 'item lain');
+  const [catatan, setCatatan] = useState(isEdit ? (barangAktif.catatan || barangAktif.catatanUtama || '') : '');
   const [punyaVarian, setPunyaVarian] = useState(isEdit ? (barangAktif.varian?.length > 0 || false) : false);
   const [varianInput, setVarianInput] = useState(isEdit ? (barangAktif.varian?.join(', ') || '') : '');
 
-  // ── 📥 2. LOGIKA RANTAI: SINKRONISASI VARIABEL RAW VS PWA ──
+  // ── 📥 2. LOGIKA RANTAI: SINKRON VARIABEL RAW VS PWA ──
   const [satuanTerbesar, setSatuanTerbesar] = useState(
-    isEdit ? (barangAktif.satuanTerbesar || barangAktif.satuanModal || 'Dus') : 'Dus'
+    isEdit ? (barangAktif.satuanBeli || barangAktif.satuanTerbesar || barangAktif.satuanModal || 'Dus') : 'Dus'
   );
   const [hargaModalAgen, setHargaModalAgen] = useState(
-    isEdit ? (barangAktif.hargaModalAgen || barangAktif.hargaAgen || '') : ''
+    isEdit ? (barangAktif.hargaModalAgen || '') : ''
   );
   const [isiKeEceran, setIsiKeEceran] = useState(
-    isEdit ? (barangAktif.isiKeEceran || barangAktif.isiGrosirBesar || barangAktif.isiSatuan || barangAktif.isiPerSatuan || '40') : '40'
+    isEdit ? (barangAktif.isiKeEceran || '40') : '40'
   );
   const [satuanEceran, setSatuanEceran] = useState(
     isEdit ? (barangAktif.satuanJual || barangAktif.satuanEceran || 'Pcs') : 'Pcs'
@@ -30,6 +32,19 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   // ── 📤 3. BLOK DATA JUAL TOKO ──
   const [jualEceran, setJualEceran] = useState(isEdit ? (barangAktif.jual || '') : '');
   const [jualGrosirTotal, setJualGrosirTotal] = useState(isEdit ? (barangAktif.jualGrosirTotal || '') : '');
+
+  // 🎯 Tambahan list daftar kategori yang ada di aplikasi kamu biar sinkron dengan menu tab
+  const daftarKategori = [
+    'Sembako/Dapur',
+    'Rokok/Korek',
+    'Minuman/Kopi/Susu',
+    'Snack/Biskuit/Roti',
+    'Mie/Instan',
+    'Sabun/Pembersih',
+    'Obat-obatan/Medical item',
+    'plastik/Cup',
+    'item lain'
+  ];
 
   if (!isOpen) return null;
 
@@ -49,19 +64,31 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!nama || Number(modalEceranTerkecil) <= 0 || !jualEceran) { alert("Nama Barang, Harga Nota, dan Jual Eceran wajib diisi ya, Fi!"); return; }
+    
+    if (!nama) { 
+      alert("Nama Barang wajib diisi ya, Fi!"); 
+      return; 
+    }
 
     onSimpan({
       nama,
+      kategori, // 🎯 SEKARANG KATEGORI HASIL PILIHAN DI FORM IKUT DISIMPAN
       modal: Number(modalEceranTerkecil), 
-      jual: Number(jualEceran),
+      modalEceran: Number(modalEceranTerkecil), 
+      jual: jualEceran ? Number(jualEceran) : '', 
+      hargaEceran: jualEceran ? Number(jualEceran) : '', 
       satuanModal: satuanTerbesar,
       satuanJual: satuanEceran,
       catatan,
       varian: punyaVarian ? varianInput.split(',').map(v => v.trim()).filter(v => v !== '') : [],
       
+      satuanBeli: satuanTerbesar, 
+      hargaAgen: hargaNota,
+      isiSatuan: totalIsiTerkecil,
+      isiPerSatuan: totalIsiTerkecil,
+
       satuanTerbesar,
-      hargaModalAgen: hargaNota,
+      hargaModalAgen: hargaNota > 0 ? hargaNota : '', 
       isiKeEceran: totalIsiTerkecil,
 
       bisaGrosir: true, 
@@ -85,8 +112,19 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingRight: '4px' }}>
           
+          {/* 🎯 INPUT 1: PILIHAN KATEGORI (BIAR BISA DIEDIT KALO SALAH MASUK) */}
           <div>
-            <label style={styleLabel}>Nama Barang</label>
+            <span style={styleLabel}>Kategori Barang</span>
+            <select value={kategori} onChange={(e) => setKategori(e.target.value)} style={{ ...styleBoxInput, backgroundColor: '#ffffff', fontWeight: '600' }}>
+              {daftarKategori.map(kat => (
+                <option key={kat} value={kat}>{kat}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* INPUT 2: NAMA BARANG */}
+          <div>
+            <span style={styleLabel}>Nama Barang</span>
             <input type="text" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Contoh: Promag / Rokok Surya" style={styleBoxInput} />
           </div>
 
@@ -95,40 +133,40 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
             
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
               <div>
-                <label style={styleLabel}>Pilih Satuan Terbesar</label>
+                <span style={styleLabel}>Pilih Satuan Terbesar</span>
                 <select value={satuanTerbesar} onChange={(e) => setSatuanTerbesar(e.target.value)} style={{ ...styleBoxInput, backgroundColor: '#ffffff', fontWeight: '600' }}>
-                  {['Dus', 'Karung/Sak', 'Pack Besar', 'Slop', 'Pak', 'Ball', 'Karton'].map(s => <option key={s} value={s}>{s}</option>)}
+                  {['Dus', 'Karung/Sak', 'Pack Besar', 'Slop', 'Pak', 'Ball', 'Karton', 'pcs', 'pack', 'rcg', 'Ikat', 'Bal', 'Kg'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
-                <label style={styleLabel}>Harga Nota 1 {satuanTerbesar}</label>
+                <span style={styleLabel}>Harga Nota 1 {satuanTerbesar}</span>
                 <input type="number" value={hargaModalAgen} onChange={(e) => setHargaModalAgen(e.target.value)} placeholder="Msl: 150000" style={{ ...styleBoxInput, backgroundColor: '#ffffff' }} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
               <div>
-                <label style={styleLabel}>Total Isi Eceran per {satuanTerbesar}</label>
+                <span style={styleLabel}>Total Isi Eceran per {satuanTerbesar}</span>
                 <div style={styleRowGrid}>
                   <input type="number" value={isiKeEceran} onChange={(e) => setIsiKeEceran(e.target.value)} placeholder="40" style={{ ...styleBoxInput, width: '45%', borderRadius: '8px 0 0 8px', borderRight: 'none', backgroundColor: '#ffffff', textAlign: 'center' }} />
                   <select value={satuanEceran} onChange={(e) => setSatuanEceran(e.target.value)} style={{ ...styleBoxInput, width: '55%', borderRadius: '0 8px 8px 0', backgroundColor: 'var(--border-color, #e5e5ea)', fontWeight: '700' }}>
-                    {['Pcs', 'Kg', 'Liter', 'Bungkus', 'Sachet', 'Botol', 'Butir'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['Pcs', 'Kg', 'Liter', 'Bungkus', 'Sachet', 'Botol', 'Butir', 'Pack', '¼', 'Galon'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label style={styleLabel}>🔒 Modal / 1 {satuanEceran} (Auto)</label>
+                <span style={styleLabel}>🔒 Modal / 1 {satuanEceran} (Auto)</span>
                 <input type="text" value={Number(modalEceranTerkecil) > 0 ? `Rp ${Math.round(Number(modalEceranTerkecil)).toLocaleString('id-ID')}` : 'Rp 0'} readOnly style={styleBoxInputReadOnly} />
               </div>
             </div>
 
             <div style={{ borderTop: '1px dashed rgba(10, 129, 104, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
-              <label style={styleLabel}>⚙️ Set Ukuran Eceran Kulakan Agen (Otomatis Mengalikan)</label>
+              <span style={styleLabel}>⚙️ Set Ukuran Eceran Kulakan Agen (Otomatis Mengalikan)</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
                 <div style={styleRowGrid}>
                   <input type="number" value={jumlahKonversiGrosir} onChange={(e) => setJumlahKonversiGrosir(e.target.value)} placeholder="10" style={{ ...styleBoxInput, width: '45%', borderRadius: '8px 0 0 8px', borderRight: 'none', backgroundColor: '#ffffff', textAlign: 'center' }} />
                   <select value={satuanGrosirNama} onChange={(e) => setSatuanGrosirNama(e.target.value)} style={{ ...styleBoxInput, width: '55%', borderRadius: '0 8px 8px 0', backgroundColor: 'var(--border-color, #e5e5ea)', fontWeight: '600' }}>
-                    {['Renteng', 'Slop', 'Pak Kecil', 'Pack', 'Bungkus', 'Lempeng', 'Kg'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['Renteng', 'Slop', 'Pak Kecil', 'Pack', 'Bungkus', 'Lempeng', 'Kg', 'rcg'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -143,11 +181,11 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
-                <label style={styleLabel}>Jual Eceran (per {satuanEceran})</label>
+                <span style={styleLabel}>Jual Eceran (per {satuanEceran})</span>
                 <input type="number" value={jualEceran} onChange={(e) => setJualEceran(e.target.value)} placeholder="Contoh: 2000" style={{ ...styleBoxInput, backgroundColor: '#ffffff' }} />
               </div>
               <div>
-                <label style={styleLabel}>Jual Grosir (per {satuanGrosirNama} - Opsional)</label>
+                <span style={styleLabel}>Jual Grosir (per {satuanGrosirNama} - Opsional)</span>
                 <input type="number" value={jualGrosirTotal} onChange={(e) => setJualGrosirTotal(e.target.value)} placeholder="Contoh: 18000" style={{ ...styleBoxInput, backgroundColor: '#ffffff' }} />
               </div>
             </div>
@@ -166,7 +204,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
           </div>
 
           <div>
-            <label style={styleLabel}>Catatan Tambahan (Opsional)</label>
+            <span style={styleLabel}>Catatan Tambahan (Opsional)</span>
             <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Ketik catatan di sini..." style={{ ...styleBoxInput, resize: 'none', height: '36px' }} />
           </div>
 
