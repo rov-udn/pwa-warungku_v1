@@ -183,7 +183,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
           <div>
             <label className={styles.checkboxLabel}>
-              <input type="checkbox" checked={punyaVarian} onChange={(e) => setPunyaVarian(e.checked)} />
+              <input type="checkbox" checked={punyaVarian} onChange={(e) => setPunyaVarian(e.target.checked)} />
               Barang punya banyak varian rasa/warna?
             </label>
             {punyaVarian && (
