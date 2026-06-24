@@ -29,7 +29,7 @@
 .searchRow {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px; /* Dikecilkan sedikit agar jarak ke kategori pas */
+  margin-bottom: 12px;
   width: 100%;
 }
 
@@ -68,27 +68,28 @@
   white-space: nowrap;
 }
 
-/* 🟢 SCROLL HORIZONTAL KATEGORI MATTE-GLOW (TAMBAHAN SAKTI) */
+/* 🟢 SCROLL HORIZONTAL KATEGORI MATTE-GLOW (FIXED NIGHT MODE CONTRAST) */
 .scrollKategori {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   margin-bottom: 16px;
   padding-bottom: 4px;
-  scrollbar-width: none; /* Sembunyikan scrollbar di Firefox */
+  scrollbar-width: none;
 }
 
 .scrollKategori::-webkit-scrollbar {
-  display: none; /* Sembunyikan scrollbar di Chrome, Safari, dan HP */
+  display: none;
 }
 
 .btnKategoriPill {
   padding: 6px 14px;
   border-radius: 20px;
   border: 1px solid var(--border-color, #eef0f3);
-  background-color: var(--bg-toggle, #f2f2f7);
-  color: var(--text-muted, #495057);
-  font-weight: 500;
+  /* 🎯 FIX 1: Gunakan warna latar dinamis agar pas di mode malam */
+  background-color: var(--bg-header, #f2f2f7);
+  color: var(--text-main, #1c1c1e); /* Diubah ke text-main agar otomatis putih di night mode */
+  font-weight: 600;
   font-size: 0.85rem;
   white-space: nowrap;
   cursor: pointer;
@@ -96,18 +97,18 @@
 }
 
 .btnKategoriActive {
-  border: 1px solid #0a8168;
-  background-color: #0a8168;
-  color: #ffffff;
+  border: 1px solid #0a8168 !important;
+  background-color: #0a8168 !important;
+  color: #ffffff !important;
   font-weight: 700;
 }
 
-/* 📦 BADGE TAG KATEGORI DI ATAS NAMA ITEM (TAMBAHAN SAKTI) */
+/* 📦 BADGE TAG KATEGORI DI ATAS NAMA ITEM */
 .badgeKategori {
   font-size: 0.68rem;
   font-weight: 800;
-  color: #0a8168;
-  background-color: rgba(10, 129, 104, 0.08);
+  color: #30d158; /* Hijau cerah di mode malam */
+  background-color: rgba(48, 209, 88, 0.15);
   padding: 2px 6px;
   border-radius: 4px;
   display: inline-block;
@@ -120,7 +121,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -129,13 +130,13 @@
 }
 
 .modalContent {
-  background-color: var(--bg-header, #ffffff);
+  background-color: #1c1c1e !important; /* Disamakan dengan modal barang baru */
   border-radius: 12px;
   padding: 20px;
   width: 100%;
   max-width: 500px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  color: var(--text-main, #1c1c1e);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  color: #ffffff !important;
 }
 
 /* 📦 DAFTAR KARTU ACCORDION */

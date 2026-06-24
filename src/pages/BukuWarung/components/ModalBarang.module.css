@@ -1,0 +1,154 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.modalContent {
+  background-color: #1c1c1e !important; /* Paksa pakai latar gelap matte */
+  color: #ffffff !important;
+  width: 100%;
+  max-width: 440px;
+  max-height: 94vh;
+  border-radius: 16px;
+  padding: 20px;
+  box-sizing: border-box;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalTitle {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff !important;
+}
+
+.formContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.inputLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #aeaeb2 !important; /* Label abu-abu terang kontras */
+  margin-bottom: 3px;
+  display: block;
+}
+
+/* 🎯 FIX UTAMA: Paksa input teks menggunakan latar belakang malam kontras dengan teks putih terang */
+.boxInput {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #3a3a3c !important;
+  font-size: 0.85rem;
+  outline: none;
+  background-color: #2c2c2e !important; /* Kotak input abu-abu gelap */
+  color: #ffffff !important; /* Teks ketikan dipaksa PUTIH BERSIH */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Dropdown option dipaksa berlatar gelap agar teks putih terbaca */
+.boxInput option {
+  background-color: #2c2c2e !important;
+  color: #ffffff !important;
+}
+
+.boxInputReadOnly {
+  background-color: #3a3a3c !important; /* Pengunci otomatis abu-abu lebih padat */
+  color: #34c759 !important; /* Teks otomatis berubah jadi HIJAU cerah ceria */
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.rowGrid {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sectionModal {
+  background-color: rgba(10, 129, 104, 0.08);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 129, 104, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitleModal {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #30d158; /* Hijau neon */
+  display: block;
+}
+
+.sectionKasir {
+  background-color: rgba(0, 122, 255, 0.08);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 122, 255, 0.25);
+}
+
+.sectionTitleKasir {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #007aff;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btnBatal {
+  flex: 1;
+  padding: 9px;
+  background-color: #3a3a3c;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  color: #aeaeb2;
+  cursor: pointer;
+}
+
+.btnSimpan {
+  flex: 1;
+  padding: 9px;
+  background-color: #34c759;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+}

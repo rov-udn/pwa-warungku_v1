@@ -177,25 +177,36 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
                     <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>{barang.jual ? `Rp ${Number(barang.jual).toLocaleString('id-ID')}` : 'Belum Set'}</strong>/{barang.satuanJual || 'Pcs'}</span>
                   </div>
 
-                  {/* ── 🎯 LOGIKA HITUNG MARGIN (HANYA MUNCUL KALAU HARGA SUDAH DIISI) ── */}
-                  <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
-                    {(() => {
-                      if (!barang.jual || !barang.hargaModalAgen) {
-                        return <span style={{ color: '#8e8e93', backgroundColor: '#f2f2f7', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>⚙️ Klik "Edit Data" Untuk Mengisi Harga</span>;
-                      }
+                  {/* ── 🎯 DISPLAY PETUNJUK UNTUK BARANG YANG BELUM DI-SET HARGA ── */}
+                    <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
+                      {(() => {
+                        if (!barang.jual || !barang.hargaModalAgen) {
+                          return (
+                            <span style={{ 
+                              color: '#aeaeb2', 
+                              backgroundColor: '#2c2c2e', // 🎯 FIX: Diubah menjadi abu-abu gelap agar teks putih terbaca kontras benderang
+                              padding: '4px 10px', 
+                              borderRadius: '6px', 
+                              display: 'inline-block',
+                              border: '1px solid #3a3a3c'
+                            }}>
+                              ⚙️ Klik "Edit Data" Untuk Mengisi Harga
+                            </span>
+                          );
+                        }
 
-                      const totalIsiPaket = Number(barang.isiKeEceran || 40);
-                      const totalOmsetPerUnitBesar = Number(barang.jual) * totalIsiPaket;
-                      const untungRupiahPerUnitBesar = totalOmsetPerUnitBesar - hargaNotaTerbesar;
-                      const persenMargin = totalOmsetPerUnitBesar > 0 ? ((untungRupiahPerUnitBesar / totalOmsetPerUnitBesar) * 100).toFixed(1) : 0;
+                        const totalIsiPaket = Number(barang.isiKeEceran || 40);
+                        const totalOmsetPerUnitBesar = Number(barang.jual) * totalIsiPaket;
+                        const untungRupiahPerUnitBesar = totalOmsetPerUnitBesar - hargaNotaTerbesar;
+                        const persenMargin = totalOmsetPerUnitBesar > 0 ? ((untungRupiahPerUnitBesar / totalOmsetPerUnitBesar) * 100).toFixed(1) : 0;
 
-                      return untungRupiahPerUnitBesar > 0 ? (
-                        <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {namaSatuanTerbesar})</span>
-                      ) : (
-                        <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>🛑 Jual Rugi: Selisih Rp {Math.abs(untungRupiahPerUnitBesar).toLocaleString('id-ID')}</span>
-                      );
-                    })()}
-                  </div>
+                        return untungRupiahPerUnitBesar > 0 ? (
+                          <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {namaSatuanTerbesar})</span>
+                        ) : (
+                          <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>🛑 Jual Rugi: Selisih Rp {Math.abs(untungRupiahPerUnitBesar).toLocaleString('id-ID')}</span>
+                        );
+                      })()}
+                    </div>
                 </div>
 
                 {isTerbuka && (
