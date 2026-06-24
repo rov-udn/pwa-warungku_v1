@@ -6,7 +6,6 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   // ── 🍏 1. NAMA, KATEGORI & VARIAN BARANG ──
   const [nama, setNama] = useState(isEdit ? (barangAktif.nama || '') : '');
-  // 🎯 TAMBAHAN: State untuk menampung Kategori agar bisa diedit
   const [kategori, setKategori] = useState(isEdit ? (barangAktif.kategori || 'item lain') : 'item lain');
   const [catatan, setCatatan] = useState(isEdit ? (barangAktif.catatan || barangAktif.catatanUtama || '') : '');
   const [punyaVarian, setPunyaVarian] = useState(isEdit ? (barangAktif.varian?.length > 0 || false) : false);
@@ -33,7 +32,6 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const [jualEceran, setJualEceran] = useState(isEdit ? (barangAktif.jual || '') : '');
   const [jualGrosirTotal, setJualGrosirTotal] = useState(isEdit ? (barangAktif.jualGrosirTotal || '') : '');
 
-  // 🎯 Tambahan list daftar kategori yang ada di aplikasi kamu biar sinkron dengan menu tab
   const daftarKategori = [
     'Sembako/Dapur',
     'Rokok/Korek',
@@ -64,7 +62,6 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
     if (!nama) { 
       alert("Nama Barang wajib diisi ya, Fi!"); 
       return; 
@@ -72,7 +69,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
     onSimpan({
       nama,
-      kategori, // 🎯 SEKARANG KATEGORI HASIL PILIHAN DI FORM IKUT DISIMPAN
+      kategori,
       modal: Number(modalEceranTerkecil), 
       modalEceran: Number(modalEceranTerkecil), 
       jual: jualEceran ? Number(jualEceran) : '', 
@@ -112,7 +109,6 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingRight: '4px' }}>
           
-          {/* 🎯 INPUT 1: PILIHAN KATEGORI (BIAR BISA DIEDIT KALO SALAH MASUK) */}
           <div>
             <span style={styleLabel}>Kategori Barang</span>
             <select value={kategori} onChange={(e) => setKategori(e.target.value)} style={{ ...styleBoxInput, backgroundColor: '#ffffff', fontWeight: '600' }}>
@@ -122,7 +118,6 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
             </select>
           </div>
 
-          {/* INPUT 2: NAMA BARANG */}
           <div>
             <span style={styleLabel}>Nama Barang</span>
             <input type="text" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Contoh: Promag / Rokok Surya" style={styleBoxInput} />
@@ -198,14 +193,27 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
             </label>
             {punyaVarian && (
               <div style={{ marginTop: '6px' }}>
-                <input type="text" value={varianInput} onChange={(e) => setVarianInput(e.target.value)} placeholder="Msl: Cokelat, Keju, Mint" style={styleBoxInput} />
+                {/* 🎯 FIX 1: Ditambahkan handler onChange agar isian varian bisa diketik */}
+                <input 
+                  type="text" 
+                  value={varianInput} 
+                  onChange={(e) => setVarianInput(e.target.value)} 
+                  placeholder="Msl: Cokelat, Keju, Mint" 
+                  style={styleBoxInput} 
+                />
               </div>
             )}
           </div>
 
           <div>
             <span style={styleLabel}>Catatan Tambahan (Opsional)</span>
-            <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Ketik catatan di sini..." style={{ ...styleBoxInput, resize: 'none', height: '36px' }} />
+            {/* 🎯 FIX 2: Ditambahkan handler onChange agar isian catatan bisa diketik */}
+            <textarea 
+              value={catatan} 
+              onChange={(e) => setCatatan(e.target.value)} 
+              placeholder="Ketik catatan di sini..." 
+              style={{ ...styleBoxInput, resize: 'none', height: '36px' }} 
+            />
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
