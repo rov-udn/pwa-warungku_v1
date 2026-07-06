@@ -1,11 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import styles from './BelanjaAgen.module.css'; // 👈 Mengunci CSS Module asli bawaan kamu!
 
 function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBelanja }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [kategoriAktif, setKategoriAktif] = useState('Semua'); 
-  const [keranjang, setKeranjang] = useState([]);
   const [tabAktif, setTabAktif] = useState('pilih'); 
+
+  // ── 🎯 FIX MUTLAK MEMORI: Auto-load data keranjang lama pas web dibuka ──
+  const [keranjang, setKeranjang] = useState(() => {
+    const dataLokal = localStorage.getItem('keranjang_belanja_agen');
+    return dataLokal ? JSON.parse(dataLokal) : [];
+  });
 
   // State untuk Modal Pemilih Kriteria
   const [modalTerbuka, setModalTerbuka] = useState(false);
@@ -14,6 +19,11 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
   const [varianTerpilih, setVarianTerpilih] = useState(''); 
   const [qtyInput, setQtyInput] = useState(1);
   const [inputHargaModal, setInputHargaModal] = useState('');
+
+  // ── 💾 EFFECT UNTUK AUTO-SAVE SETIAP KALI KERANJANG BERUBAH ──
+  useEffect(() => {
+    localStorage.setItem('keranjang_belanja_agen', JSON.stringify(keranjang));
+  }, [keranjang]);
 
   // ── 🟢 KATEGORI DIKUNCI SESUAI DATABASE BUKU WARUNG KAMU ──
   const daftarKategori = ['Semua', 'Sembako/Dapur', 'Mie/Instan', 'Minuman/Kopi/Susu', 'Rokok/Korek', 'Snack/Biskuit/Roti', 'Sabun/Pembersih', 'Obat-obatan/Medical item', 'plastik/Cup', 'item lain'];
@@ -102,39 +112,86 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
     return keranjang.reduce((total, item) => total + (item.qty * item.modalBaru), 0);
   };
 
-  const handleShareUniversal = () => {
+  const handleShareUniversal = async () => {
     if (keranjang.length === 0) return;
 
     const tgl = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' });
     const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-    let teksNota = `🏪 *WARUNG HAERUDIN*\n`; 
+    let teksNota = `🏪 *PESANAN BARANG - WARUNG HASAN*\n`; 
     teksNota += `📅 ${tgl} | ⏰ ${jam} WIB\n`;
     teksNota += `--------------------------------\n\n`;
-    teksNota += `*DAFTAR PESANAN KULAKAN:*\n\n`;
+    teksNota += `*DAFTAR KULAKAN (Per Kategori):*\n\n`;
 
-    keranjang.forEach((item, index) => {
-      teksNota += `${index + 1}. ${item.nama}\n`;
-      teksNota += `   👉 Kuantitas: *${item.qty} ${item.satuanModal}*\n`;
-      teksNota += `   👉 Est. Modal: Rp ${(item.modalBaru).toLocaleString('id-ID')} / ${item.satuanModal}\n\n`;
+    // ── 📦 1. PENGELOMPOKKAN BARANG BERDASARKAN KATEGORI ──
+    // Kita buat wadah kosong untuk menampung barang sesuai kategorinya
+    const kelompokKategori = {};
+
+    keranjang.forEach((item) => {
+      // Cari data barang asli dari daftarBarang untuk melihat kategorinya
+      const barangAsli = daftarBarang.find(b => b.id === item.id);
+      const namaKategori = (barangAsli?.kategori || 'item lain').trim();
+
+      // Jika wadah kategorinya belum ada, buat baru berupa array kosong
+      if (!kelompokKategori[namaKategori]) {
+        kelompokKategori[namaKategori] = [];
+      }
+      // Masukkan item keranjang ke dalam kelompoknya
+      kelompokKategori[namaKategori].push(item);
     });
-    
+
+    // ── 📝 2. MENYUSUN TEKS NOTA WA PER KATEGORI ──
+    // Loop melintasi urutan kategori resmi yang kamu punya
+    daftarKategori.forEach((kat) => {
+      if (kat === 'Semua') return; // Lewati kategori 'Semua' karena ini hanya untuk filter filter
+
+      // Cari apakah ada barang belanjaan di kategori ini
+      // Kita pakai mencocokkan lowercase biar aman dari salah ketik huruf besar/kecil
+      const namaKatKey = Object.keys(kelompokKategori).find(k => k.toLowerCase() === kat.toLowerCase());
+      const barangDiKategori = kelompokKategori[namaKatKey];
+
+      // Jika ada barangnya, tulis nama kategorinya dan list barangnya ke bawah
+      if (barangDiKategori && barangDiKategori.length > 0) {
+        teksNota += `📁 *KATEGORI: ${kat.toUpperCase()}*\n`;
+        
+        barangDiKategori.forEach((item, index) => {
+          teksNota += `  ${index + 1}. ${item.nama}\n`;
+          teksNota += `     x *${item.qty} ${item.satuanModal}*\n`;
+        });
+        
+        teksNota += `\n`; // Beri jarak antar kategori biar renggang rapi
+      }
+    });
+
     teksNota += `--------------------------------\n`;
-    teksNota += `*Total Estimasi Pengeluaran:* Rp ${hitungTotalEstimasi().toLocaleString('id-ID')}\n\n`;
     teksNota += `_Mohon disiapkan ya Ko/Cik, terima kasih!_ 🙏`;
 
+    // ── 🚀 EKSEKUSI SHARE SEPERTI BIASA ──
     if (navigator.share) {
-      navigator.share({ title: 'Pesanan Warung Haerudin', text: teksNota }).catch((err) => console.log(err));
+      try {
+        await navigator.share({ title: 'Pesanan Warung Hasan', text: teksNota });
+        
+        if (typeof onTambahHistoryBelanja === 'function') {
+          onTambahHistoryBelanja(keranjang);
+        }
+        setKeranjang([]);
+        localStorage.removeItem('keranjang_belanja_agen');
+        setTabAktif('pilih'); 
+        
+      } catch (err) {
+        console.log("Share dibatalkan oleh Rofi, data keranjang aman.", err);
+      }
     } else {
       navigator.clipboard.writeText(teksNota);
       alert("📋 Daftar pesanan sudah dicopy ke HP, Fi!");
+      
+      if (typeof onTambahHistoryBelanja === 'function') {
+        onTambahHistoryBelanja(keranjang);
+      }
+      setKeranjang([]);
+      localStorage.removeItem('keranjang_belanja_agen');
+      setTabAktif('pilih');
     }
-
-    if (typeof onTambahHistoryBelanja === 'function') {
-      onTambahHistoryBelanja(keranjang);
-    }
-    setKeranjang([]);
-    setTabAktif('pilih'); 
   };
 
   return (
@@ -297,8 +354,8 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
                     const isVarianAktif = varianTerpilih === v;
                     return (
                       <button 
-                        key={v} 
                         type="button" 
+                        key={v} 
                         onClick={() => setVarianTerpilih(v)} 
                         style={{ padding: '6px 12px', borderRadius: '6px', border: isVarianAktif ? '1px solid #0a8168' : '1px solid #ced4da', backgroundColor: isVarianAktif ? 'rgba(10,129,104,0.1)' : '#fff', color: isVarianAktif ? '#0a8168' : '#333', fontWeight: isVarianAktif ? '700' : '500', fontSize: '0.8rem', cursor: 'pointer' }}
                       >
@@ -316,7 +373,6 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
               {(() => {
                 const options = [];
                 
-                // 1. TANGGA ATAS: Mengambil Satuan Modal Terbesar (Dus/Karung/Slop)
                 const unitBesar = barangTerpilih.satuanModal || barangTerpilih.satuanTerbesar || 'Dus';
                 options.push({
                   type: 'tanggaAtas',
@@ -324,7 +380,6 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
                   calculate: () => barangTerpilih.hargaModalAgen || barangTerpilih.hargaAgen || 0
                 });
 
-                // 2. TANGGA TENGAH: Mengambil Jembatan Menengah Kulakan (Renteng/Bungkus)
                 if (barangTerpilih.satuanGrosirNama && barangTerpilih.satuanGrosirNama !== unitBesar) {
                   options.push({
                     type: 'tanggaTengah',
@@ -333,7 +388,6 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
                   });
                 }
 
-                // 3. TANGGA BAWAH: Mengambil Satuan Eceran Terkecil Toko (Pcs/Kg)
                 const unitKecil = barangTerpilih.satuanJual || 'Pcs';
                 if (unitKecil !== unitBesar && unitKecil !== barangTerpilih.satuanGrosirNama) {
                   options.push({
