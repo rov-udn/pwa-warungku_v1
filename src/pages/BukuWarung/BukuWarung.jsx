@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import ModalBarang from './components/ModalBarang';
 import { importAndTransformJSON } from '../../utils/migrationHelpers';
 import styles from './BukuWarung.module.css'; 
+import SearchBaru from '../../component/SearchBarKategori/SearchBaru';
 
 function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBarang, onMigrasiFirestore, onAddLogPerubahanHarga }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -131,22 +132,18 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         </div>
       )}
 
-      <div>
-        <div className={styles.searchRow}>
-          <input type="text" placeholder="🔎 Ketik nama barang..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={styles.searchBar} />
-          <button onClick={bukaModalTambah} className={styles.btnTambah}>+ Barang</button>
-          <button onClick={() => setIsImportModalOpen(true)} className={styles.btnImport}>📥 Migrasi</button>
-        </div>
-
-        <div className={styles.scrollKategori}>
-          {daftarKategori.map((kat) => {
-            const isAktif = kategoriAktif === kat && !filterRugiAktif;
-            return (
-              <button key={kat} type="button" onClick={() => { setKategoriAktif(kat); setFilterRugiAktif(false); }} className={`${styles.btnKategoriPill} ${isAktif ? styles.btnKategoriActive : ''}`}>{kat}</button>
-            );
-          })}
-        </div>
-      </div>
+      <SearchBaru
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        kategoriAktif={kategoriAktif}
+        setKategoriAktif={setKategoriAktif}
+        daftarKategori={daftarKategori}
+        placeholder="🔎 Ketik nama barang..."
+      >
+        {/* 💡 FIX: Memanggil fungsi pembuka modal yang asli */}
+        <button type="button" onClick={bukaModalTambah} className={styles.btnTambah}>+ Barang</button>
+        <button type="button" onClick={() => setIsImportModalOpen(true)} className={styles.btnImport}>Import</button>
+      </SearchBaru>
 
       <div className={styles.listContainer}>
         {barangFiltered.length > 0 ? (

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import styles from './BelanjaAgen.module.css'; // 👈 Mengunci CSS Module asli bawaan kamu!
+import SearchBaru from '../../component/SearchBarKategori/SearchBaru'; // 👈 Komponen SearchBaru yang sudah diperbarui
 
 function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBelanja }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -218,41 +219,20 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
 
       {/* ── 📦 TAB 1: AREA LIHAT BARANG DAN MASUKIN KERANJANG ── */}
       {tabAktif === 'pilih' && (
-        <div>
-          <input 
-            type="text"
-            placeholder="🔎 Cari barang kulakan (Indomie, Surya, dll)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={styles.searchBar}
-          />
+  <div>
+    {/* 💡 FIX MUTLAK: Menggunakan komponen SearchBaru yang seragam */}
+    <SearchBaru
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      kategoriAktif={kategoriAktif}
+      setKategoriAktif={setKategoriAktif}
+      daftarKategori={daftarKategori}
+      placeholder="🔎 Cari barang kulakan (Indomie, Surya, dll)..."
+    /> {/* 👈 Langsung ditutup di sini karena menu Belanja Agen tidak butuh tombol tambahan di header search */}
 
-          {/* Scroll Horizontal Kategori */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-            {daftarKategori.map((kat) => {
-              const isAktif = kategoriAktif === kat;
-              return (
-                <button
-                  key={kat}
-                  type="button"
-                  onClick={() => setKategoriAktif(kat)}
-                  style={{
-                    padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s ease',
-                    border: isAktif ? '1px solid #0a8168' : '1px solid var(--border-color, #eef0f3)',
-                    backgroundColor: isAktif ? '#0a8168' : 'var(--bg-header, #ffffff)',
-                    color: isAktif ? '#ffffff' : 'var(--text-muted, #8e8e93)',
-                    fontWeight: isAktif ? '700' : '500'
-                  }}
-                >
-                  {kat}
-                </button>
-              );
-            })}
-          </div>
-
-          <h3 style={{ fontSize: '0.95rem', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main, #1c1c1e)', textAlign: 'left' }}>
-            Pilih Barang Toko
-          </h3>
+    <h3 style={{ fontSize: '0.95rem', fontWeight: '800', marginTop: '14px', marginBottom: '8px', color: 'var(--text-main, #1c1c1e)', textAlign: 'left' }}>
+      Pilih Barang Toko
+    </h3>
           <div className={styles.gridBarang}>
             {barangFiltered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, Fi. 🧐</div>
