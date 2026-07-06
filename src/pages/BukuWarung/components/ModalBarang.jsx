@@ -55,6 +55,20 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const modalEceranTerkecil = hargaNota > 0 && totalIsiTerkecil > 0 ? (hargaNota / totalIsiTerkecil).toFixed(4) : '0';
   const modalGrosirMenengahTerhitung = (Number(modalEceranTerkecil) * isiPerGrosirMenengah).toFixed(4);
 
+  // 🛢️ HELPER KONVERSI KG KE LITER (MINYAK SAYUR)
+  const handleKonversiMinyak = () => {
+    const beratKg = Number(isiKeEceran) || 0;
+    if (beratKg <= 0) {
+      alert("Masukkan angka berat (Kg) di kotak isi eceran dulu, Fi!");
+      return;
+    }
+    // Rumus fisis: Liter = Kg / 0.92
+    const hasilLiter = (beratKg / 0.92).toFixed(2);
+    
+    setIsiKeEceran(hasilLiter);
+    setSatuanEceran('Liter');
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!nama) { 
@@ -149,6 +163,33 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
                 <input type="text" value={Number(modalEceranTerkecil) > 0 ? `Rp ${Math.round(Number(modalEceranTerkecil)).toLocaleString('id-ID')}` : 'Rp 0'} readOnly className={`${styles.boxInput} ${styles.boxInputReadOnly}`} />
               </div>
             </div>
+
+            {/* ⚡ TOMBOL FITUR KONVERSI KHUSUS MINYAK SAYUR */}
+            {kategori === 'Sembako/Dapur' && (
+              <div style={{ marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleKonversiMinyak}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    backgroundColor: '#e6f4ea',
+                    border: '1px solid #137333',
+                    color: '#137333',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  🛢️ Konversi {isiKeEceran || 0} Kg ke Liter (Minyak Sayur)
+                </button>
+              </div>
+            )}
 
             <div style={{ borderTop: '1px dashed rgba(10, 129, 104, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
               <span className={styles.inputLabel}>⚙️ Set Ukuran Eceran Kulakan Agen (Otomatis Mengalikan)</span>
