@@ -5,18 +5,21 @@ import BukuWarung from './pages/BukuWarung/BukuWarung.jsx';
 import Header from './component/header/Header.jsx';
 import BelanjaAgen from './pages/BelanjaAgen/BelanjaAgen.jsx';
 import HistoryWarung from './pages/History/HistoryWarung.jsx';
-import { initialBarang } from './data/initialBarang.js';
 import RightSidebar from './component/sidebar/RightSidebar.jsx';
 import './global.css'; // 🎯 Pastikan diimport sebagai CSS biasa, bukan module!
+
+// ⚡ IMPOR FIREBASE DATABASE
+import { db } from './firebase.js';
+import { ref, onValue, set } from 'firebase/database';
 
 function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // 🟢 LOGIKA LOCALSTORAGE
+  // 🟢 LOGIKA OFFLINE-FIRST: Ambil data lokal dulu pas pertama aplikasi dibuka (Biar Instan!)
   const [daftarBarang, setDaftarBarang] = useState(() => {
     const dataTersimpan = localStorage.getItem('warung_daftar_barang');
-    return dataTersimpan ? JSON.parse(dataTersimpan) : initialBarang;
+    return dataTersimpan ? JSON.parse(dataTersimpan) : [];
   });
 
   const [historyBelanja, setHistoryBelanja] = useState(() => {
@@ -29,14 +32,44 @@ function App() {
     return logTersimpan ? JSON.parse(logTersimpan) : [];
   });
 
-  // 🔄 EFFECT SYNC LOCALSTORAGE
+  // ── 🔄 SINKRONISASI REALTIME DARI FIREBASE (MENIMPA LOKAL JIKA ONLINE) ──
   useEffect(() => {
-    localStorage.setItem('warung_daftar_barang', JSON.stringify(daftarBarang));
-  }, [daftarBarang]);
+    // 1. Dengerin data barang
+    const barangRef = ref(db, 'warung_daftar_barang');
+    const unsubBarang = onValue(barangRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setDaftarBarang(data);
+        localStorage.setItem('warung_daftar_barang', JSON.stringify(data));
+      }
+    });
 
-  useEffect(() => {
-    localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(logPerubahanHarga));
-  }, [logPerubahanHarga]);
+    // 2. Dengerin history belanja
+    const historyRef = ref(db, 'warung_history_belanja');
+    const unsubHistory = onValue(historyRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setHistoryBelanja(data);
+        localStorage.setItem('warung_history_belanja', JSON.stringify(data));
+      }
+    });
+
+    // 3. Dengerin log perubahan harga
+    const logRef = ref(db, 'warung_log_perubahan_harga');
+    const unsubLog = onValue(logRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setLogPerubahanHarga(data);
+        localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(data));
+      }
+    });
+
+    return () => {
+      unsubBarang();
+      unsubHistory();
+      unsubLog();
+    };
+  }, []);
 
   // ── 🔧 HELPER KONVERSI GROSIR AMAN ──
   const perPieceFromTotal = (total, units) => {
@@ -45,34 +78,45 @@ function App() {
     return Math.round(t / u);
   };
 
-  // ── LOGIKA MUTASI DATA BARANG ──
+  // ── LOGIKA MUTASI DATA BARANG + SYNC KE FIREBASE ──
   const handleTambahBarang = useCallback((barangBaru) => {
-    setDaftarBarang((prevBarang) => [
-      ...prevBarang,
-      { ...barangBaru, id: Date.now() }
-    ]);
+    setDaftarBarang((prevBarang) => {
+      const updateData = [...prevBarang, { ...barangBaru, id: Date.now() }];
+      localStorage.setItem('warung_daftar_barang', JSON.stringify(updateData));
+      set(ref(db, 'warung_daftar_barang'), updateData); // 🚀 Tembak Firebase
+      return updateData;
+    });
   }, []);
 
   const handleEditBarang = useCallback((id, dataDiperbarui) => {
-    setDaftarBarang((prevBarang) =>
-      prevBarang.map((barang) =>
+    setDaftarBarang((prevBarang) => {
+      const updateData = prevBarang.map((barang) =>
         barang.id === id ? { ...barang, ...dataDiperbarui } : barang
-      )
-    );
+      );
+      localStorage.setItem('warung_daftar_barang', JSON.stringify(updateData));
+      set(ref(db, 'warung_daftar_barang'), updateData); // 🚀 Tembak Firebase
+      return updateData;
+    });
   }, []);
 
   const handleHapusBarang = useCallback((id) => {
     if(window.confirm("Yakin mau hapus barang ini dari toko, Fi?")) {
-      setDaftarBarang((prevBarang) => prevBarang.filter(barang => barang.id !== id));
+      setDaftarBarang((prevBarang) => {
+        const updateData = prevBarang.filter(barang => barang.id !== id);
+        localStorage.setItem('warung_daftar_barang', JSON.stringify(updateData));
+        set(ref(db, 'warung_daftar_barang'), updateData); // 🚀 Tembak Firebase
+        return updateData;
+      });
     }
   }, []);
 
-  // ── 🛠️ FUNGSI AUTO-SYNC HARGA MODAL (BERSIH & AMAN) ──
+  // ── 🛠️ FUNGSI AUTO-SYNC HARGA MODAL (SINKRON KE FIREBASE & LOG) ──
   const handleUpdateHargaModal = useCallback((idBarang, hargaModalBaru, satuanBeliAgen = 'Pcs', prevModal = null) => {
     let logBaruBaru = null;
+    let daftarBarangTerupdate = [];
 
-    setDaftarBarang((prevBarang) =>
-      prevBarang.map((barang) => {
+    setDaftarBarang((prevBarang) => {
+      daftarBarangTerupdate = prevBarang.map((barang) => {
         if (barang.id === idBarang) {
           let modalEceranTerkecil;
 
@@ -99,11 +143,20 @@ function App() {
           return { ...barang, modal: modalEceranTerkecil };
         }
         return barang;
-      })
-    );
+      });
+
+      localStorage.setItem('warung_daftar_barang', JSON.stringify(daftarBarangTerupdate));
+      set(ref(db, 'warung_daftar_barang'), daftarBarangTerupdate); // 🚀 Tembak Firebase
+      return daftarBarangTerupdate;
+    });
 
     if (logBaruBaru) {
-      setLogPerubahanHarga((prevLog) => [logBaruBaru, ...prevLog]);
+      setLogPerubahanHarga((prevLog) => {
+        const updateLog = [logBaruBaru, ...prevLog];
+        localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(updateLog));
+        set(ref(db, 'warung_log_perubahan_harga'), updateLog); // 🚀 Tembak Firebase Log
+        return updateLog;
+      });
     }
   }, []);
 
@@ -116,7 +169,12 @@ function App() {
       modalLama: Number(modalLama) || 0,
       modalBaru: Number(modalBaru) || 0
     };
-    setLogPerubahanHarga((prev) => [entry, ...prev]);
+    setLogPerubahanHarga((prev) => {
+      const updateLog = [entry, ...prev];
+      localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(updateLog));
+      set(ref(db, 'warung_log_perubahan_harga'), updateLog); // 🚀 Tembak Firebase Log
+      return updateLog;
+    });
   }, []);
 
   // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (VERSI SINKRONISASI MASSAL) ──
@@ -124,15 +182,12 @@ function App() {
     setHistoryBelanja((prevHistory) => {
       const historyUpdate = prevHistory.map((nota) => {
         if (nota.id === idNota) {
-          return {
-            ...nota,
-            items: itemsDiperbarui,
-            totalPengeluarannya: totalPengeluaranBaru
-          };
+          return { ...nota, items: itemsDiperbarui, totalPengeluarannya: totalPengeluaranBaru };
         }
         return nota;
       });
       localStorage.setItem('warung_history_belanja', JSON.stringify(historyUpdate));
+      set(ref(db, 'warung_history_belanja'), historyUpdate); // 🚀 Tembak Firebase
       return historyUpdate;
     });
 
@@ -156,6 +211,7 @@ function App() {
       });
 
       localStorage.setItem('warung_daftar_barang', JSON.stringify(barangUpdate));
+      set(ref(db, 'warung_daftar_barang'), barangUpdate); // 🚀 Tembak Firebase
       return barangUpdate;
     });
   }, []);
@@ -179,11 +235,12 @@ function App() {
       });
 
       localStorage.setItem('warung_history_belanja', JSON.stringify(historyFiltered));
+      set(ref(db, 'warung_history_belanja'), historyFiltered); // 🚀 Tembak Firebase
       return historyFiltered;
     });
   }, []);
 
-  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA (🎯 FIXED: DENGAN LOGIKA UNIT DUS/KG & AUTO-SORT A-Z)
+  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA
   const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
     try {
       const tebakKategoriDariNama = (namaBarang) => {
@@ -266,8 +323,8 @@ function App() {
           id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           nama: itemLama.nama || 'Tanpa Nama',
           modal: modalEceranAwal, 
-          hargaModalAgen: totalHargaAgen,         // Rp Agen Terbesar (M:)
-          jual: hargaJualMurni,                   // Jual Eceran terkecil
+          hargaModalAgen: totalHargaAgen,
+          jual: hargaJualMurni,
           satuanModal: satuanModalFinal,
           satuanJual: satuanJualFinal,
           isiGrosirBesar: minimalGrosirBesarDefault,
@@ -287,24 +344,20 @@ function App() {
         };
       });
 
-      // 🎯 URUTKAN BERDASARKAN ABJAD A-Z SEBELUM DISIMPAN
-      const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => {
-        return (a.nama || '').localeCompare(b.nama || '');
-      });
+      const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
 
       setDaftarBarang(dataSudahUrutAZ);
       localStorage.setItem('warung_daftar_barang', JSON.stringify(dataSudahUrutAZ));
+      set(ref(db, 'warung_daftar_barang'), dataSudahUrutAZ); // 🚀 Tembak Firebase
 
-      alert(`✅ Berhasil Sempurna! ${dataSudahUrutAZ.length} barang rapi berurutan A-Z di laci masing-masing!`);
+      alert(`✅ Berhasil Sempurna! ${dataSudahUrutAZ.length} barang rapi berurutan A-Z di Firebase & Laci!`);
     } catch (error) {
       console.error("Eror konversi data:", error);
       alert("❌ Waduh gagal konversi data, cek log konsol!");
     }
   }, []);
   
-  const [activePage, setActivePage] = useState(() => {
-    return window.innerWidth <= 768 ? 'dashboard' : 'buku-warung';
-  });
+  const [activePage, setActivePage] = useState(() => window.innerWidth <= 768 ? 'dashboard' : 'buku-warung');
 
   useEffect(() => {
     const handleResize = () => {
@@ -314,9 +367,7 @@ function App() {
     };
 
     const handleScroll = () => {
-      if (window.innerWidth <= 768) {
-        setIsScrolled(window.scrollY > 30);
-      }
+      if (window.innerWidth <= 768) setIsScrolled(window.scrollY > 30);
     };
 
     window.addEventListener('resize', handleResize);
@@ -481,9 +532,7 @@ function App() {
           {memoedMainContent}
         </div>
       }
-      
-        rightPanel={
-        // 🍏 KUNCI: Jika halaman aktif adalah dashboard, sembunyikan total right panel-nya!
+      rightPanel={
         activePage === 'dashboard' ? null : (
           <RightSidebar logPerubahanHarga={logPerubahanHarga} />
         )
