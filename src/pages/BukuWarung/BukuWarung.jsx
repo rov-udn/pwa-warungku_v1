@@ -139,6 +139,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         setKategoriAktif={setKategoriAktif}
         daftarKategori={daftarKategori}
         placeholder="🔎 Ketik nama barang..."
+        style={{ '--searchbar-offset': '18px' }}
       >
         {/* 💡 FIX: Memanggil fungsi pembuka modal yang asli */}
         <button type="button" onClick={bukaModalTambah} className={styles.btnTambah}>+ Barang</button>

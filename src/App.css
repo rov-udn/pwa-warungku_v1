@@ -62,3 +62,9 @@ button {
   height: 100%;
   box-sizing: border-box;
 }
+
+@media (max-width: 768px) {
+  .mainArea {
+    padding-bottom: 75px !important; /* Memberi nafas ruang di bawah tombol navigasi HP */
+  }
+}

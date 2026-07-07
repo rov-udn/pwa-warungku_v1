@@ -220,7 +220,7 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
       {/* ── 📦 TAB 1: AREA LIHAT BARANG DAN MASUKIN KERANJANG ── */}
       {tabAktif === 'pilih' && (
   <div>
-    {/* 💡 FIX MUTLAK: Menggunakan komponen SearchBaru yang seragam */}
+    {/* 💡 FIX MUTLAK: Offset khusus agar searchbar tidak naik melewati tabHeader di mobile */}
     <SearchBaru
       searchTerm={searchTerm}
       setSearchTerm={setSearchTerm}
@@ -228,6 +228,7 @@ function BelanjaAgen({ daftarBarang = [], onUpdateHargaModal, onTambahHistoryBel
       setKategoriAktif={setKategoriAktif}
       daftarKategori={daftarKategori}
       placeholder="🔎 Cari barang kulakan (Indomie, Surya, dll)..."
+      style={{ '--searchbar-offset': '68px' }}
     /> {/* 👈 Langsung ditutup di sini karena menu Belanja Agen tidak butuh tombol tambahan di header search */}
 
     <h3 style={{ fontSize: '0.95rem', fontWeight: '800', marginTop: '14px', marginBottom: '8px', color: 'var(--text-main, #1c1c1e)', textAlign: 'left' }}>

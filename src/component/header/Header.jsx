@@ -98,9 +98,9 @@ function Header({ activePage, daftarBarang = [] }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <h1 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main, #1c1c1e)', whiteSpace: 'nowrap' }}>W. Haerudin</h1>
               <span style={{
-                backgroundColor: isOnline ? 'rgba(39, 174, 96, 0.12)' : 'rgba(235, 87, 87, 0.12)',
+                backgroundColor: isOnline ? 'rgba(39, 174, 96, 0.12)' : 'rgba(220, 38, 38, 0.14)',
                 padding: '4px', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                border: isOnline ? '1px solid rgba(39, 174, 96, 0.15)' : '1px solid rgba(235, 87, 87, 0.15)',
+                border: isOnline ? '1px solid rgba(39, 174, 96, 0.2)' : '1px solid rgba(220, 38, 38, 0.2)',
               }}>
                 <span style={{ width: '6px', height: '6px', backgroundColor: isOnline ? '#2cc96b' : '#ff4d4d', borderRadius: '50%', boxShadow: isOnline ? '0 0 6px #2cc96b' : '0 0 6px #ff4d4d' }}></span>
               </span>
@@ -147,7 +147,7 @@ function Header({ activePage, daftarBarang = [] }) {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '0.68rem', paddingBottom: '2px', height: '16px' }}>
             <div style={{ color: 'var(--text-muted, #8e8e93)', fontWeight: '500' }}>
-              Aplikasi Utama / <span style={{ color: '#0a8168', fontWeight: '700' }}>{activePage === 'buku-warung' ? 'Data Barang' : 'Dashboard'}</span>
+              Aplikasi Utama / <span style={{ color: 'var(--accent)', fontWeight: '700' }}>{activePage === 'buku-warung' ? 'Data Barang' : 'Dashboard'}</span>
             </div>
             <div style={{ color: 'var(--text-muted, #8e8e93)', fontWeight: '500', display: 'flex', gap: '6px', alignItems: 'center' }}>
               <span>📅 {currentTime.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' })}</span>
@@ -188,7 +188,7 @@ function Header({ activePage, daftarBarang = [] }) {
         >
           <span style={{ 
             fontSize: '0.65rem', 
-            color: '#1c1c1e',   
+            color: 'var(--text-main)',   
             fontWeight: '900',  
             transition: 'transform 0.3s',
             display: 'inline-block',

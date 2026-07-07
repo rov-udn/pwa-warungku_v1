@@ -59,11 +59,12 @@ function MainMenuNav({ halamanAktif, onMenuClick }) {
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
-              backgroundColor: isActive ? 'var(--bg-nav-active, rgba(10, 129, 104, 0.08))' : 'transparent',
-              color: isActive ? 'var(--accent-nav-active, #0a8168)' : 'var(--text-main, #1c1c1e)',
+              backgroundColor: isActive ? 'var(--bg-nav-active, rgba(10, 129, 104, 0.12))' : 'transparent',
+              color: isActive ? 'var(--accent-nav-active, #0a8168)' : 'var(--text-main, #1f2937)',
               fontWeight: isActive ? '700' : '500',
               textAlign: 'left',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              boxShadow: isActive ? 'inset 0 0 0 1px var(--accent-soft, rgba(10, 129, 104, 0.18))' : 'none'
             }}
           >
             {/* Render Ikon SVG Langsung sebagai Elemen React */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import DashboardLayout from './component/layout/DashboardLayout.jsx';
 import MainMenuNav from './component/sidebar/MainMenuNav.jsx';
 import BukuWarung from './pages/BukuWarung/BukuWarung.jsx';
@@ -12,57 +12,55 @@ import './global.css'; // 🎯 Pastikan diimport sebagai CSS biasa, bukan module
 import { db } from './firebase.js';
 import { ref, onValue, set } from 'firebase/database';
 
+const STORAGE_KEYS = {
+  barang: 'warung_daftar_barang',
+  history: 'warung_history_belanja',
+  logHarga: 'warung_log_perubahan_harga'
+};
+
+const MOBILE_BREAKPOINT = 768;
+
+const readStoredState = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const savedValue = localStorage.getItem(key);
+    return savedValue ? JSON.parse(savedValue) : fallback;
+  } catch (error) {
+    console.warn(`Gagal membaca ${key}:`, error);
+    return fallback;
+  }
+};
+
 function App() {
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= MOBILE_BREAKPOINT);
   const [isScrolled, setIsScrolled] = useState(false);
+  const lastScrollYRef = useRef(0);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // 🟢 LOGIKA OFFLINE-FIRST: Ambil data lokal dulu pas pertama aplikasi dibuka (Biar Instan!)
-  const [daftarBarang, setDaftarBarang] = useState(() => {
-    const dataTersimpan = localStorage.getItem('warung_daftar_barang');
-    return dataTersimpan ? JSON.parse(dataTersimpan) : [];
-  });
+  const [daftarBarang, setDaftarBarang] = useState(() => readStoredState(STORAGE_KEYS.barang, []));
+  const [historyBelanja, setHistoryBelanja] = useState(() => readStoredState(STORAGE_KEYS.history, []));
+  const [logPerubahanHarga, setLogPerubahanHarga] = useState(() => readStoredState(STORAGE_KEYS.logHarga, []));
 
-  const [historyBelanja, setHistoryBelanja] = useState(() => {
-    const historyTersimpan = localStorage.getItem('warung_history_belanja');
-    return historyTersimpan ? JSON.parse(historyTersimpan) : [];
-  });
-
-  const [logPerubahanHarga, setLogPerubahanHarga] = useState(() => {
-    const logTersimpan = localStorage.getItem('warung_log_perubahan_harga');
-    return logTersimpan ? JSON.parse(logTersimpan) : [];
-  });
+  const persistAndSync = useCallback((key, value) => {
+    localStorage.setItem(key, JSON.stringify(value));
+    set(ref(db, key), value);
+  }, []);
 
   // ── 🔄 SINKRONISASI REALTIME DARI FIREBASE (MENIMPA LOKAL JIKA ONLINE) ──
   useEffect(() => {
-    // 1. Dengerin data barang
-    const barangRef = ref(db, 'warung_daftar_barang');
-    const unsubBarang = onValue(barangRef, (snapshot) => {
+    const subscribeToPath = (path, key, setter) => onValue(ref(db, path), (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        setDaftarBarang(data);
-        localStorage.setItem('warung_daftar_barang', JSON.stringify(data));
+        setter(data);
+        localStorage.setItem(key, JSON.stringify(data));
       }
     });
 
-    // 2. Dengerin history belanja
-    const historyRef = ref(db, 'warung_history_belanja');
-    const unsubHistory = onValue(historyRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setHistoryBelanja(data);
-        localStorage.setItem('warung_history_belanja', JSON.stringify(data));
-      }
-    });
-
-    // 3. Dengerin log perubahan harga
-    const logRef = ref(db, 'warung_log_perubahan_harga');
-    const unsubLog = onValue(logRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setLogPerubahanHarga(data);
-        localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(data));
-      }
-    });
+    const unsubBarang = subscribeToPath('warung_daftar_barang', STORAGE_KEYS.barang, setDaftarBarang);
+    const unsubHistory = subscribeToPath('warung_history_belanja', STORAGE_KEYS.history, setHistoryBelanja);
+    const unsubLog = subscribeToPath('warung_log_perubahan_harga', STORAGE_KEYS.logHarga, setLogPerubahanHarga);
 
     return () => {
       unsubBarang();
@@ -82,33 +80,30 @@ function App() {
   const handleTambahBarang = useCallback((barangBaru) => {
     setDaftarBarang((prevBarang) => {
       const updateData = [...prevBarang, { ...barangBaru, id: Date.now() }];
-      localStorage.setItem('warung_daftar_barang', JSON.stringify(updateData));
-      set(ref(db, 'warung_daftar_barang'), updateData); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.barang, updateData);
       return updateData;
     });
-  }, []);
+  }, [persistAndSync]);
 
   const handleEditBarang = useCallback((id, dataDiperbarui) => {
     setDaftarBarang((prevBarang) => {
       const updateData = prevBarang.map((barang) =>
         barang.id === id ? { ...barang, ...dataDiperbarui } : barang
       );
-      localStorage.setItem('warung_daftar_barang', JSON.stringify(updateData));
-      set(ref(db, 'warung_daftar_barang'), updateData); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.barang, updateData);
       return updateData;
     });
-  }, []);
+  }, [persistAndSync]);
 
   const handleHapusBarang = useCallback((id) => {
-    if(window.confirm("Yakin mau hapus barang ini dari toko, Fi?")) {
+    if (window.confirm('Yakin mau hapus barang ini dari toko, Fi?')) {
       setDaftarBarang((prevBarang) => {
-        const updateData = prevBarang.filter(barang => barang.id !== id);
-        localStorage.setItem('warung_daftar_barang', JSON.stringify(updateData));
-        set(ref(db, 'warung_daftar_barang'), updateData); // 🚀 Tembak Firebase
+        const updateData = prevBarang.filter((barang) => barang.id !== id);
+        persistAndSync(STORAGE_KEYS.barang, updateData);
         return updateData;
       });
     }
-  }, []);
+  }, [persistAndSync]);
 
   // ── 🛠️ FUNGSI AUTO-SYNC HARGA MODAL (SINKRON KE FIREBASE & LOG) ──
   const handleUpdateHargaModal = useCallback((idBarang, hargaModalBaru, satuanBeliAgen = 'Pcs', prevModal = null) => {
@@ -145,20 +140,18 @@ function App() {
         return barang;
       });
 
-      localStorage.setItem('warung_daftar_barang', JSON.stringify(daftarBarangTerupdate));
-      set(ref(db, 'warung_daftar_barang'), daftarBarangTerupdate); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.barang, daftarBarangTerupdate);
       return daftarBarangTerupdate;
     });
 
     if (logBaruBaru) {
       setLogPerubahanHarga((prevLog) => {
         const updateLog = [logBaruBaru, ...prevLog];
-        localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(updateLog));
-        set(ref(db, 'warung_log_perubahan_harga'), updateLog); // 🚀 Tembak Firebase Log
+        persistAndSync(STORAGE_KEYS.logHarga, updateLog);
         return updateLog;
       });
     }
-  }, []);
+  }, [persistAndSync]);
 
   const addLogPerubahanHarga = useCallback(({ namaBarang, modalLama, modalBaru }) => {
     if (modalLama === modalBaru) return;
@@ -171,11 +164,10 @@ function App() {
     };
     setLogPerubahanHarga((prev) => {
       const updateLog = [entry, ...prev];
-      localStorage.setItem('warung_log_perubahan_harga', JSON.stringify(updateLog));
-      set(ref(db, 'warung_log_perubahan_harga'), updateLog); // 🚀 Tembak Firebase Log
+      persistAndSync(STORAGE_KEYS.logHarga, updateLog);
       return updateLog;
     });
-  }, []);
+  }, [persistAndSync]);
 
   // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (VERSI SINKRONISASI MASSAL) ──
   const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
@@ -186,14 +178,13 @@ function App() {
         }
         return nota;
       });
-      localStorage.setItem('warung_history_belanja', JSON.stringify(historyUpdate));
-      set(ref(db, 'warung_history_belanja'), historyUpdate); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.history, historyUpdate);
       return historyUpdate;
     });
 
     setDaftarBarang((prevBarang) => {
       const barangUpdate = prevBarang.map((barang) => {
-        const itemKoreksi = itemsDiperbarui.find(item => item.id === barang.id);
+        const itemKoreksi = itemsDiperbarui.find((item) => item.id === barang.id);
         if (itemKoreksi) {
           const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
           const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
@@ -210,17 +201,16 @@ function App() {
         return barang;
       });
 
-      localStorage.setItem('warung_daftar_barang', JSON.stringify(barangUpdate));
-      set(ref(db, 'warung_daftar_barang'), barangUpdate); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.barang, barangUpdate);
       return barangUpdate;
     });
-  }, []);
+  }, [persistAndSync]);
 
   // ── 📅 FUNGSI TAMBAH HISTORY BELANJAAN ──
   const handleTambahHistoryBelanja = useCallback((keranjangData) => {
     const notaBaru = {
       id: `NOTA-${Date.now()}`,
-      tanggal: new Date().toLocaleDateString('id-ID', { 
+      tanggal: new Date().toLocaleDateString('id-ID', {
         day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
       }),
       items: keranjangData,
@@ -229,16 +219,15 @@ function App() {
     setHistoryBelanja((prevHistory) => {
       const historyTerbaru = [notaBaru, ...prevHistory];
       const batasWaktu = Date.now() - (15 * 24 * 60 * 60 * 1000);
-      const historyFiltered = historyTerbaru.filter(nota => {
+      const historyFiltered = historyTerbaru.filter((nota) => {
         const idTimestamp = Number(nota.id.split('-')[1]);
         return idTimestamp > batasWaktu;
       });
 
-      localStorage.setItem('warung_history_belanja', JSON.stringify(historyFiltered));
-      set(ref(db, 'warung_history_belanja'), historyFiltered); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.history, historyFiltered);
       return historyFiltered;
     });
-  }, []);
+  }, [persistAndSync]);
 
   // 🚀 FUNGSI ADAPTER FIRESTORE LAMA
   const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
@@ -347,27 +336,37 @@ function App() {
       const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
 
       setDaftarBarang(dataSudahUrutAZ);
-      localStorage.setItem('warung_daftar_barang', JSON.stringify(dataSudahUrutAZ));
-      set(ref(db, 'warung_daftar_barang'), dataSudahUrutAZ); // 🚀 Tembak Firebase
+      persistAndSync(STORAGE_KEYS.barang, dataSudahUrutAZ);
 
       alert(`✅ Berhasil Sempurna! ${dataSudahUrutAZ.length} barang rapi berurutan A-Z di Firebase & Laci!`);
     } catch (error) {
       console.error("Eror konversi data:", error);
       alert("❌ Waduh gagal konversi data, cek log konsol!");
     }
-  }, []);
+  }, [persistAndSync]);
   
-  const [activePage, setActivePage] = useState(() => window.innerWidth <= 768 ? 'dashboard' : 'buku-warung');
+  const [activePage, setActivePage] = useState(() => window.innerWidth <= MOBILE_BREAKPOINT ? 'dashboard' : 'buku-warung');
 
   useEffect(() => {
     const handleResize = () => {
-      const mobileStatus = window.innerWidth <= 768;
+      const mobileStatus = window.innerWidth <= MOBILE_BREAKPOINT;
       setIsMobile(mobileStatus);
-      if (!mobileStatus) setIsScrolled(false);
+      if (!mobileStatus) {
+        setIsScrolled(false);
+        setShowBackToTop(false);
+      }
     };
 
     const handleScroll = () => {
-      if (window.innerWidth <= 768) setIsScrolled(window.scrollY > 30);
+      if (window.innerWidth <= MOBILE_BREAKPOINT) {
+        const currentScrollY = window.scrollY;
+        setIsScrolled(currentScrollY > 30);
+        const isScrollingUp = currentScrollY > 120 && currentScrollY < lastScrollYRef.current;
+        setShowBackToTop(isScrollingUp);
+        lastScrollYRef.current = currentScrollY;
+      } else {
+        setShowBackToTop(false);
+      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -414,7 +413,7 @@ function App() {
           {isMobile && (
             <button 
               onClick={() => setActivePage('dashboard')} 
-              style={{ marginTop: '16px', padding: '10px 16px', background: '#2a2a2a', border: 'none', color: '#fff', borderRadius: '10px', width: '100%', fontWeight: '700', fontSize: '0.9rem' }}
+              style={{ marginTop: '16px', padding: '10px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '10px', width: '100%', fontWeight: '700', fontSize: '0.9rem' }}
             >
               ⬅ Kembali ke Dashboard Utama
             </button>
@@ -438,7 +437,7 @@ function App() {
           {isMobile && (
             <button 
               onClick={() => setActivePage('dashboard')} 
-              style={{ marginTop: '20px', padding: '10px 16px', background: '#2a2a2a', border: 'none', color: '#fff', borderRadius: '6px', width: '100%', fontWeight: '500' }}
+              style={{ marginTop: '20px', padding: '10px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px', width: '100%', fontWeight: '500' }}
             >
               ⬅ Kembali ke Dashboard Utama
             </button>
@@ -472,7 +471,7 @@ function App() {
         <div style={{ padding: '20px 0', textAlign: 'center' }}>
           <h3>🎰 Modul Kasir</h3>
           <p style={{ color: 'var(--text-muted)' }}>Menu ini dinonaktifkan sementara karena kamu lebih cepat pakai manual! ⚡</p>
-          {isMobile && <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: '#2a2a2a', border: 'none', color: '#fff', borderRadius: '6px' }}>Kembali</button>}
+          {isMobile && <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px' }}>Kembali</button>}
         </div>
       );
     }
@@ -480,7 +479,7 @@ function App() {
     return (
       <div style={{ textAlign: 'center', padding: '40px' }}>
         <h3>Modul {activePage} sedang dikembangkan</h3>
-        <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: '#2a2a2a', border: 'none', color: '#fff', borderRadius: '6px' }}>Kembali</button>
+        <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px' }}>Kembali</button>
       </div>
     );
   }, [isMobile, activePage, daftarBarang, historyBelanja, logPerubahanHarga, handleUpdateHargaModal, addLogPerubahanHarga, handleTambahHistoryBelanja, handleTambahBarang, handleEditBarang, handleHapusBarang, handleMigrasiDataFirestore, handleKoreksiNota, handleMenuClick]);
@@ -493,34 +492,50 @@ function App() {
       sidebar={
         isMobile ? (
           activePage !== 'dashboard' ? (
-            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-around', alignItems: 'center', height: '100%', padding: '0 10px' }}>
-              <button onClick={() => setActivePage('dashboard')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'dashboard' ? '#ffb703' : '#88888b'}>
-                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                </svg>
-              </button>
-              <button onClick={() => setActivePage('belanja')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'belanja' ? '#ffb703' : '#88888b'}>
-                  <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-                </svg>
-              </button>
-              <button onClick={() => setActivePage('history')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'history' ? '#ffb703' : '#88888b'}>
-                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-                </svg>
-              </button>
-              <button onClick={() => setActivePage('buku-warung')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'buku-warung' ? '#ffb703' : '#88888b'}>
-                  <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.2 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 11.55V22"/>
-                </svg>
-              </button>
-            </div>
-          ) : null
+      /* 🎯 FIX MUTLAK LAYOUT MOBILE: Kunci navigasi di paling dasar kaca layar HP */
+      <div style={{ 
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '60px', /* Kunci tinggi navigasi bawah */
+        backgroundColor: 'var(--bg-header, #171a21)', /* Menyesuaikan tema */
+        borderTop: '1px solid var(--border-color, #2f3643)',
+        display: 'flex', 
+        width: '100%', 
+        justifyContent: 'space-around', 
+        alignItems: 'center', 
+        padding: '0 10px',
+        boxSizing: 'border-box',
+        zIndex: 9999 /* Di atas semua elemen, tapi di bawah pop-up kriteria modal */
+      }}>
+        <button onClick={() => setActivePage('dashboard')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'dashboard' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+          </svg>
+        </button>
+        <button onClick={() => setActivePage('belanja')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'belanja' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+          </svg>
+        </button>
+        <button onClick={() => setActivePage('history')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'history' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+          </svg>
+        </button>
+        <button onClick={() => setActivePage('buku-warung')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'buku-warung' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+            <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.2 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 11.55V22"/>
+          </svg>
+        </button>
+      </div>
+    ) : null
         ) : (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '240px', height: '100vh', backgroundColor: '#121214', borderRight: '1px solid #2a2a2a', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', zIndex: 90 }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '240px', height: '100vh', backgroundColor: 'var(--bg-header)', borderRight: '1px solid var(--border-color)', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', zIndex: 90 }}>
             <p style={{ fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '15px' }}>NAVIGASI</p>
             <MainMenuNav halamanAktif={activePage} onMenuClick={handleMenuClick} />
-            <div style={{ marginTop: 'auto', background: '#121212', padding: '12px', borderRadius: '8px', border: '1px solid #2a2a2a' }}>
+            <div style={{ marginTop: 'auto', background: 'var(--surface)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <p style={{ color: 'var(--text-muted)' }}>Status App</p>
               <p style={{ color: '#00e676', fontWeight: 'bold', marginTop: '4px' }}>Rp Ready</p>
             </div>
@@ -528,8 +543,34 @@ function App() {
         )
       }
       mainContent={
-        <div className="mainArea">
+        <div className="mainArea" style={{ position: 'relative' }}>
           {memoedMainContent}
+          {isMobile && showBackToTop && (
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              style={{
+                position: 'fixed',
+                bottom: '84px',
+                right: '16px',
+                zIndex: 10000,
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'linear-gradient(180deg, #0dbd97, #0a8168)',
+                color: '#fff',
+                boxShadow: '0 14px 30px rgba(10, 129, 104, 0.25)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.1rem'
+              }}
+            >
+              ⬆
+            </button>
+          )}
         </div>
       }
       rightPanel={

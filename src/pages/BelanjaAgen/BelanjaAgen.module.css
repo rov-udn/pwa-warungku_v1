@@ -6,12 +6,17 @@
 
 /* 🕹️ HEADER NAVIGASI TAB */
 .tabHeader {
+  position: sticky;
+  top: calc(var(--dynamic-header-height, 210px) + 8px);
+  z-index: 90;
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
-  background-color: var(--bg-toggle, #f2f2f7);
-  padding: 4px;
-  border-radius: 10px;
+  margin-bottom: 14px;
+  background-color: var(--surface, var(--bg-header, #ffffff));
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #eef0f3);
+  box-shadow: 0 4px 12px var(--shadow-soft, rgba(15, 23, 42, 0.06));
 }
 
 .tabBtn {
@@ -32,13 +37,13 @@
 }
 
 .tabBtnActive {
-  background-color: var(--bg-header, #ffffff);
-  color: #0a8168;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  background: linear-gradient(135deg, var(--accent, #0a8168), var(--accent-strong, #0d6e5a));
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(10, 129, 104, 0.2);
 }
 
 .badgeCount {
-  background-color: #0a8168;
+  background-color: rgba(255, 255, 255, 0.22);
   color: #ffffff;
   font-size: 0.72rem;
   padding: 2px 6px;
@@ -277,6 +282,54 @@
    📱 📱 MODIFIKASI KHUSUS LAYAR HP (MOBILE RESPONSIVE SAKTI) 📱 📱
    ========================================================================== */
 @media (max-width: 768px) {
+  .container {
+    padding: 0 2px;
+  }
+
+  .tabHeader {
+    top: calc(var(--dynamic-header-height, 210px) + 8px) !important;
+    margin-bottom: 10px;
+    z-index: 90;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .tabBtn {
+    padding: 12px 10px;
+    font-size: 0.9rem;
+    border-radius: 12px;
+  }
+
+  .searchBar {
+    margin-bottom: 12px;
+  }
+
+  .gridBarang,
+  .itemBelanja {
+    gap: 10px;
+  }
+
+  .itemBelanja {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rightSection {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .hargaContainer {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .btnHapusRow {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+  }
+
   .itemBelanja {
     flex-direction: column;       /* Ubah total arah card jadi numpuk ke bawah */
     align-items: stretch;         /* Paksa komponen melebar penuh mengikuti card */

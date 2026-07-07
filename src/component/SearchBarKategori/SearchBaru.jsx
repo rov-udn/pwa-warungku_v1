@@ -8,10 +8,11 @@ function SearchBaru({
   setKategoriAktif, 
   daftarKategori = [],
   placeholder = "🔎 Cari barang...",
-  children // 💡 Tempat menampung tombol tambahan (seperti tombol +Tambah atau Import)
+  children, // 💡 Tempat menampung tombol tambahan (seperti tombol +Tambah atau Import)
+  style = {}
 }) {
   return (
-    <div className={styles.stickyHeader}>
+    <div className={styles.stickyHeader} style={style}>
       {/* Baris Pencarian & Tombol Aksi */}
       <div className={styles.searchRow}>
         <input 
