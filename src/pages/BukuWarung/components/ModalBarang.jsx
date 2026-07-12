@@ -47,13 +47,14 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   if (!isOpen) return null;
 
-  // 🧮 LIVE CALCULATION
+  // 🧮 LIVE CALCULATION SAKTI (DIAMANKAN KE NUMBER BULAT MATANG)
   const hargaNota = Number(hargaModalAgen) || 0;
   const totalIsiTerkecil = Number(isiKeEceran) || 1;
   const isiPerGrosirMenengah = Number(jumlahKonversiGrosir) || 1;
 
-  const modalEceranTerkecil = hargaNota > 0 && totalIsiTerkecil > 0 ? (hargaNota / totalIsiTerkecil).toFixed(4) : '0';
-  const modalGrosirMenengahTerhitung = (Number(modalEceranTerkecil) * isiPerGrosirMenengah).toFixed(4);
+  // 🎯 KUNCI AMAN: Menggunakan Math.ceil agar pembulatan modal SELALU KE ATAS
+const modalEceranTerkecil = hargaNota > 0 && totalIsiTerkecil > 0 ? Math.ceil(hargaNota / totalIsiTerkecil) : 0;
+const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosirMenengah);
 
   // 🛢️ HELPER KONVERSI KG KE LITER (MINYAK SAYUR)
   const handleKonversiMinyak = () => {
@@ -76,11 +77,12 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       return; 
     }
 
+    // Eksekusi kirim data bersih final ke state induk gudang
     onSimpan({
       nama,
       kategori,
-      modal: Number(modalEceranTerkecil), 
-      modalEceran: Number(modalEceranTerkecil), 
+      modal: modalEceranTerkecil, 
+      modalEceran: modalEceranTerkecil, 
       jual: jualEceran ? Number(jualEceran) : '', 
       hargaEceran: jualEceran ? Number(jualEceran) : '', 
       satuanModal: satuanTerbesar,
@@ -100,7 +102,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       bisaGrosir: true, 
       satuanGrosirNama: satuanGrosirNama,
       minimalBeliGrosir: isiPerGrosirMenengah,
-      modalGrosirTotal: Number(modalGrosirMenengahTerhitung),
+      modalGrosirTotal: modalGrosirMenengahTerhitung,
       
       jualGrosirTotal: jualGrosirTotal ? Number(jualGrosirTotal) : null,
       jualGrosir: jualGrosirTotal ? Math.round(Number(jualGrosirTotal) / isiPerGrosirMenengah) : null
@@ -160,7 +162,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
               </div>
               <div>
                 <span className={styles.inputLabel}>🔒 Modal / 1 {satuanEceran} (Auto)</span>
-                <input type="text" value={Number(modalEceranTerkecil) > 0 ? `Rp ${Math.round(Number(modalEceranTerkecil)).toLocaleString('id-ID')}` : 'Rp 0'} readOnly className={`${styles.boxInput} ${styles.boxInputReadOnly}`} />
+                <input type="text" value={modalEceranTerkecil > 0 ? `Rp ${modalEceranTerkecil.toLocaleString('id-ID')}` : 'Rp 0'} readOnly className={`${styles.boxInput} ${styles.boxInputReadOnly}`} />
               </div>
             </div>
 
@@ -201,7 +203,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
                   </select>
                 </div>
                 <div>
-                  <input type="text" value={Number(modalGrosirMenengahTerhitung) > 0 ? `Rp ${Math.round(Number(modalGrosirMenengahTerhitung)).toLocaleString('id-ID')} / ${satuanGrosirNama}` : `Rp 0 / ${satuanGrosirNama}`} readOnly className={`${styles.boxInput} ${styles.boxInputReadOnly}`} />
+                  <input type="text" value={modalGrosirMenengahTerhitung > 0 ? `Rp ${modalGrosirMenengahTerhitung.toLocaleString('id-ID')} / ${satuanGrosirNama}` : `Rp 0 / ${satuanGrosirNama}`} readOnly className={`${styles.boxInput} ${styles.boxInputReadOnly}`} />
                 </div>
               </div>
             </div>

@@ -73,7 +73,7 @@ function App() {
   const perPieceFromTotal = (total, units) => {
     const t = Number(total) || 0;
     const u = Math.max(1, Number(units) || 1);
-    return Math.round(t / u);
+    return Math.ceil(t / u); // 🎯 Maksa ke atas
   };
 
   // ── LOGIKA MUTASI DATA BARANG + SYNC KE FIREBASE ──
@@ -122,7 +122,7 @@ function App() {
             const isiPerRenteng = Number(barang.minimalBeliGrosir) || 10;
             modalEceranTerkecil = perPieceFromTotal(hargaModalBaru, isiPerRenteng);
           } else {
-            modalEceranTerkecil = Math.round(Number(hargaModalBaru) || 0);
+            modalEceranTerkecil = Math.ceil(Number(hargaModalBaru) || 0);
           }
 
           const modalLamaUntukLog = prevModal !== null ? Number(prevModal) : (barang.modal || 0);
@@ -169,7 +169,7 @@ function App() {
     });
   }, [persistAndSync]);
 
-  // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (VERSI SINKRONISASI MASSAL) ──
+  // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (SINKRON GUDANG + 🎯 FIX AUTO TRIGGER LOG HARGA) ──
   const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
     setHistoryBelanja((prevHistory) => {
       const historyUpdate = prevHistory.map((nota) => {
@@ -182,20 +182,38 @@ function App() {
       return historyUpdate;
     });
 
+    const logAntreanBaru = [];
+
     setDaftarBarang((prevBarang) => {
       const barangUpdate = prevBarang.map((barang) => {
         const itemKoreksi = itemsDiperbarui.find((item) => item.id === barang.id);
+        
         if (itemKoreksi) {
           const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
           const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
-          const isiJembatanTengah = Number(barang.minimalBeliGrosir) || 10;
-          const modalGrosirMenengahBaru = Number((modalEceranBaru * isiJembatanTengah).toFixed(4));
+          
+          const isiGrosirMenengah = Number(barang.minimalBeliGrosir) || 10;
+          const modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * isiGrosirMenengah);
+
+          // 🎯 DETEKSI PERUBAHAN HARGA NOTA AGEN: Dorong ke Riwayat Harga
+          const hargaAgenLama = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
+          
+          if (hargaNotaAgenBaru !== hargaAgenLama && hargaAgenLama > 0) {
+            logAntreanBaru.push({
+              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+              namaBarang: barang.nama,
+              modalLama: hargaAgenLama,
+              modalBaru: hargaNotaAgenBaru
+            });
+          }
 
           return {
             ...barang,
             modal: modalEceranBaru,
             hargaModalAgen: hargaNotaAgenBaru,
-            modalGrosirTotal: modalGrosirMenengahBaru
+            modalGrosirTotal: modalGrosirMenengahBaru,
+            jualGrosirBesarTotal: hargaNotaAgenBaru
           };
         }
         return barang;
@@ -204,9 +222,17 @@ function App() {
       persistAndSync(STORAGE_KEYS.barang, barangUpdate);
       return barangUpdate;
     });
+
+    if (logAntreanBaru.length > 0) {
+      setLogPerubahanHarga((prevLog) => {
+        const updateLog = [...logAntreanBaru, ...prevLog];
+        persistAndSync(STORAGE_KEYS.logHarga, updateLog);
+        return updateLog;
+      });
+    }
   }, [persistAndSync]);
 
-  // ── 📅 FUNGSI TAMBAH HISTORY BELANJAAN ──
+  // 📅 FUNGSI TAMBAH HISTORY BELANJAAN
   const handleTambahHistoryBelanja = useCallback((keranjangData) => {
     const notaBaru = {
       id: `NOTA-${Date.now()}`,
@@ -344,7 +370,7 @@ function App() {
       alert("❌ Waduh gagal konversi data, cek log konsol!");
     }
   }, [persistAndSync]);
-  
+
   const [activePage, setActivePage] = useState(() => window.innerWidth <= MOBILE_BREAKPOINT ? 'dashboard' : 'buku-warung');
 
   useEffect(() => {
@@ -408,6 +434,7 @@ function App() {
           <BelanjaAgen 
             daftarBarang={daftarBarang}
             onUpdateHargaModal={handleUpdateHargaModal}
+            /* 🎯 FIX MUTLAK HURUF h KECIL SESUAI DEKLARASI STATE ATAS */
             onTambahHistoryBelanja={handleTambahHistoryBelanja}
           />
           {isMobile && (
@@ -453,6 +480,7 @@ function App() {
             historyBelanja={historyBelanja} 
             logPerubahanHarga={logPerubahanHarga}
             onKoreksiNota={handleKoreksiNota}
+            daftarBarang={daftarBarang} 
           />
           {isMobile && (
             <button 
@@ -492,45 +520,44 @@ function App() {
       sidebar={
         isMobile ? (
           activePage !== 'dashboard' ? (
-      /* 🎯 FIX MUTLAK LAYOUT MOBILE: Kunci navigasi di paling dasar kaca layar HP */
-      <div style={{ 
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '60px', /* Kunci tinggi navigasi bawah */
-        backgroundColor: 'var(--bg-header, #171a21)', /* Menyesuaikan tema */
-        borderTop: '1px solid var(--border-color, #2f3643)',
-        display: 'flex', 
-        width: '100%', 
-        justifyContent: 'space-around', 
-        alignItems: 'center', 
-        padding: '0 10px',
-        boxSizing: 'border-box',
-        zIndex: 9999 /* Di atas semua elemen, tapi di bawah pop-up kriteria modal */
-      }}>
-        <button onClick={() => setActivePage('dashboard')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'dashboard' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-          </svg>
-        </button>
-        <button onClick={() => setActivePage('belanja')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'belanja' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-          </svg>
-        </button>
-        <button onClick={() => setActivePage('history')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'history' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-          </svg>
-        </button>
-        <button onClick={() => setActivePage('buku-warung')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'buku-warung' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-            <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.2 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 11.55V22"/>
-          </svg>
-        </button>
-      </div>
-    ) : null
+            <div style={{ 
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '60px',
+              backgroundColor: 'var(--bg-header, #171a21)',
+              borderTop: '1px solid var(--border-color, #2f3643)',
+              display: 'flex', 
+              width: '100%', 
+              justifyContent: 'space-around', 
+              alignItems: 'center', 
+              padding: '0 10px',
+              boxSizing: 'border-box',
+              zIndex: 9999
+            }}>
+              <button onClick={() => setActivePage('dashboard')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'dashboard' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+              </button>
+              <button onClick={() => setActivePage('belanja')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'belanja' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+                  <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+                </svg>
+              </button>
+              <button onClick={() => setActivePage('history')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'history' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                </svg>
+              </button>
+              <button onClick={() => setActivePage('buku-warung')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'buku-warung' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
+                  <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.2 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 11.55V22"/>
+                </svg>
+              </button>
+            </div>
+          ) : null
         ) : (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '240px', height: '100vh', backgroundColor: 'var(--bg-header)', borderRight: '1px solid var(--border-color)', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', zIndex: 90 }}>
             <p style={{ fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '15px' }}>NAVIGASI</p>
