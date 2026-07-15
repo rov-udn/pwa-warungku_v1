@@ -36,35 +36,55 @@ export function transformFirestoreDoc(doc, docId, idx) {
     kategoriFinal = 'Rokok/Korek';
   }
 
+  // Ambil nilai numerik dengan fallback yang aman
+  const safeNumber = (v, fallback = 0) => {
+    const n = Number(v);
+    return Number.isNaN(n) ? fallback : n;
+  };
+
+  // Normalisasi satuan
+  const normalizeSatuan = (s) => {
+    if (!s) return 'Pcs';
+    const t = String(s).trim();
+    return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+  };
+
   return {
-    id: docId || `${Date.now()}-${idx}`,
+    id: docId || (doc.id || `${Date.now()}-${idx}`),
     nama: nama,
-    
-    // ── 🎯 TARGET RESET: Semua nominal diset kosong/null agar status otomatis "Belum Set" ──
-    modal: '',            // Kosong agar dibaca sebagai string kosong di state
-    hargaModalAgen: '',   
-    jual: '',             
-    hargaEceran: '',      
-    
-    satuanModal: (doc.satuanBeli || 'Pcs').charAt(0).toUpperCase() + (doc.satuanBeli || 'Pcs').slice(1).toLowerCase(),
-    satuanJual: 'Pcs',
-    varian: [],
-    
-    // Logika grosir di-reset nominalnya, tapi strukturnya tetap aktif agar siap diisi
-    bisaGrosir: bisaGrosir,
-    minimalBeliGrosir: bisaGrosir ? 10 : null,
-    jualGrosir: null,
-    satuanGrosirNama: bisaGrosir ? 'Renteng' : '',
-    
-    bisaGrosirBesar: bisaGrosirBesar,
-    minimalBeliGrosirBesar: bisaGrosirBesar ? (satuanBeliLower.includes('slop') || satuanBeliLower.includes('pak kecil') ? 12 : 40) : null,
-    jualGrosirBesarTotal: null,
-    jualGrosirBesarPerPcs: null,
-    satuanGrosirBesarNama: bisaGrosirBesar ? satuanGrosirBesarNama : '',
-    
-    catatan: catatan,
-    stok: Number(doc.stok || 0),
-    kategori: kategoriFinal
+
+    // Salin harga jika tersedia, jika tidak tetap kosong string untuk menandakan belum di-set
+    modal: doc.modal !== undefined ? doc.modal : (doc.modalEceran ?? ''),
+    hargaModalAgen: doc.hargaModalAgen !== undefined ? doc.hargaModalAgen : (doc.hargaAgen ?? ''),
+    jual: doc.jual !== undefined ? doc.jual : (doc.jual ?? ''),
+    hargaEceran: doc.hargaEceran !== undefined ? doc.hargaEceran : (doc.hargaEceran ?? ''),
+
+    // Satuan & varian
+    satuanModal: normalizeSatuan(doc.satuanModal || doc.satuanBeli),
+    satuanJual: normalizeSatuan(doc.satuanJual || doc.satuanBeli),
+    varian: Array.isArray(doc.varian) ? doc.varian : (doc.varian ? [doc.varian] : []),
+
+    // Preserve grosir-related fields from source JSON when present
+    bisaGrosir: doc.bisaGrosir !== undefined ? Boolean(doc.bisaGrosir) : bisaGrosir,
+    minimalBeliGrosir: safeNumber(doc.minimalBeliGrosir, bisaGrosir ? 10 : null),
+    jualGrosir: doc.jualGrosir !== undefined ? doc.jualGrosir : (doc.jualGrosir ?? null),
+    satuanGrosirNama: doc.satuanGrosirNama || (bisaGrosir ? 'Renteng' : ''),
+
+    bisaGrosirBesar: doc.bisaGrosirBesar !== undefined ? Boolean(doc.bisaGrosirBesar) : bisaGrosirBesar,
+    minimalBeliGrosirBesar: safeNumber(doc.minimalBeliGrosirBesar, bisaGrosirBesar ? 40 : null),
+    jualGrosirBesarTotal: doc.jualGrosirBesarTotal !== undefined ? doc.jualGrosirBesarTotal : null,
+    jualGrosirBesarPerPcs: doc.jualGrosirBesarPerPcs !== undefined ? doc.jualGrosirBesarPerPcs : null,
+    satuanGrosirBesarNama: doc.satuanGrosirBesarNama || (bisaGrosirBesar ? satuanGrosirBesarNama : ''),
+
+    catatan: catatan || doc.catatan || '',
+    stok: safeNumber(doc.stok, 0),
+    kategori: kategoriFinal,
+
+    // Additional helpers preserved from source if present
+    isiKeEceran: safeNumber(doc.isiKeEceran, doc.isiPerSatuan || doc.isiSatuan || 1),
+    isiPerSatuan: safeNumber(doc.isiPerSatuan, doc.isiSatuan || doc.isiKeEceran || 1),
+    modalEceran: doc.modalEceran !== undefined ? doc.modalEceran : (doc.modalEceran ?? ''),
+    modalGrosirTotal: doc.modalGrosirTotal !== undefined ? doc.modalGrosirTotal : null
   };
 }
 
