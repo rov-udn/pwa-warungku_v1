@@ -27,3 +27,4 @@ firestore_*.json
 *.njsproj
 *.sln
 *.sw?
+*.msi

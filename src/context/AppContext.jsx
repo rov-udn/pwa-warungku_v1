@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase.js'; 
-import { ref, onValue, set } from 'firebase/database';
+import { ref, set, onValue, update } from 'firebase/database';
 
 // 🎯 IMPOR MODUL AUTHENTICATION DARI FIREBASE
 import { auth } from '../firebase.js';
@@ -382,7 +382,7 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
     });
   }, [persistAndSync, STORAGE_KEYS.history]);
 
-  const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
+  const handleMigrasiDataFirestore = useCallback(async (dataFirestoreLama) => {
     try {
       const tebakKategoriDariNama = (namaBarang) => {
         const namaKecKecil = (namaBarang || '').toLowerCase();
@@ -431,14 +431,33 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
       });
 
       const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+      
+      // 1. Simpan ke state lokal React agar UI langsung update rapi A-Z
       setDaftarBarang(dataSudahUrutAZ);
-      persistAndSync(STORAGE_KEYS.barang, dataSudahUrutAZ);
-      alert(`✅ Berhasil! ${dataSudahUrutAZ.length} barang rapi berurutan A-Z!`);
+
+      // 2. 🎯 STRATEGI BARU: Ubah Array menjadi Objek Map berdasarkan ID masing-masing
+      // Agar Firebase Realtime Database menerimanya berjejer secara massal, bukan menimpa folder
+      const paketUpdateFirebase = {};
+      dataSudahUrutAZ.forEach((barang) => {
+        paketUpdateFirebase[barang.id] = barang;
+      });
+
+      // 3. Import langsung ke path target database akun baru kamu
+      // Pastikan variabel 'uid' atau 'userWarung.uid' sudah tersedia di dalam scope AppContext kamu ya!
+      const targetBarangRef = ref(db, `users/${userWarung?.uid}/daftarBarang`);
+      
+      // Tembak secara massal menggunakan update() agar masuk semua sekaligus!
+      await update(targetBarangRef, paketUpdateFirebase);
+
+      // 4. Cadangkan juga ke LocalStorage lokal laptop sebagai backup cadangan
+      localStorage.setItem(STORAGE_KEYS.barang, JSON.stringify(dataSudahUrutAZ));
+
+      alert(`✅ Berhasil! ${dataSudahUrutAZ.length} barang masuk sekaligus secara rapi berurutan A-Z!`);
     } catch (error) {
       console.error(error);
       alert("❌ Gagal konversi data!");
     }
-  }, [persistAndSync, STORAGE_KEYS.barang]);
+  }, [ STORAGE_KEYS.barang, userWarung]);
 
   return (
     <AppContext.Provider value={{
