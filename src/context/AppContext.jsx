@@ -459,6 +459,21 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
     }
   }, [ STORAGE_KEYS.barang, userWarung]);
 
+  // ── 🛡️ SAFE IMPORT: Terima array barang (sudah ditransform) dan simpan dengan aman
+  const handleImportDaftarBarang = useCallback((dataArray) => {
+    try {
+      if (!Array.isArray(dataArray)) return { success: false, message: 'Input harus berupa array' };
+      const dataSudahUrut = dataArray.slice().sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+      setDaftarBarang(dataSudahUrut);
+      // Gunakan persistAndSync agar naming key dan firebase path konsisten dengan app
+      persistAndSync(STORAGE_KEYS.barang, dataSudahUrut);
+      return { success: true, count: dataSudahUrut.length };
+    } catch (err) {
+      console.error('Import gagal', err);
+      return { success: false, error: err.message };
+    }
+  }, [persistAndSync, STORAGE_KEYS.barang]);
+
   return (
     <AppContext.Provider value={{
       userWarung,
@@ -478,7 +493,8 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
       addLogPerubahanHarga, 
       handleKoreksiNota,
       handleTambahHistoryBelanja, 
-      handleMigrasiDataFirestore
+      handleMigrasiDataFirestore,
+      handleImportDaftarBarang
     }}>
       {children}
     </AppContext.Provider>

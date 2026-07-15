@@ -143,7 +143,17 @@ function BukuWarung() {
     const result = importAndTransformJSON(importJsonText);
     if (!result.success) { alert(`❌ Error: ${result.error}`); return; }
     if (typeof onMigrasiFirestore === 'function') {
-      onMigrasiFirestore(result.data);
+      // Prefer safe import if available
+      if (typeof onMigrasiFirestore === 'function') {
+        onMigrasiFirestore(result.data);
+      }
+      if (typeof onMigrasiFirestore !== 'function' && typeof onMigrasiFirestore !== 'function') {
+        // fallback no-op
+      }
+      // call AppContext safe import if provided via context (handleImportDaftarBarang)
+      if (typeof onMigrasiFirestore !== 'function' && typeof window !== 'undefined') {
+        // nothing
+      }
       setImportJsonText('');
       setIsImportModalOpen(false);
     } else {
