@@ -1,208 +1,131 @@
 :root {
-  /* 🌅 Light Mode - Primary Colors */
-  --bg-main: #f7f8fa;
-  --bg-header: #ffffff;
-  --bg-secondary: #eef0f3;
-  --bg-input: #f2f2f7;
+  --bg-main: linear-gradient(135deg, #f6f8fc 0%, #eef5ff 48%, #fdfefe 100%);
+  --bg-header: rgba(255, 255, 255, 0.9);
+  --bg-secondary: #edf3ff;
+  --bg-input: #f5f7fb;
   --bg-sidebar: #ffffff;
-  
-  /* 📝 Light Mode - Text Colors */
-  --text-main: #1c1c1e;
-  --text-secondary: #8e8e93;
-  --text-muted: #a8a8ad;
-  
-  /* 🟢 Light Mode - Accent Colors */
-  --accent-emerald: #0a8168;
-  --accent-emerald-light: #0c9a7f;
-  --accent-emerald-hover: #087154;
-  
-  /* 🎨 Light Mode - Border & Divider */
-  --border-light: #eef0f3;
-  --border-medium: #d9dce1;
-  --divider: rgba(0, 0, 0, 0.05);
+  --bg-surface: #ffffff;
+  --bg-toggle: #f2f7ff;
+  --bg: #ffffff;
 
-  /* 🕹️ Navigation Active States */
+  --text-main: #162033;
+  --text-secondary: #5f6d85;
+  --text-muted: #8090a7;
+  --text-h: #162033;
+
+  --accent-emerald: #0a8168;
+  --accent-emerald-light: #16a085;
+  --accent-emerald-hover: #087154;
+  --accent-soft: rgba(10, 129, 104, 0.12);
+
+  --border-light: #e8edf7;
+  --border-medium: #d7dfeb;
+  --border: #e4e6eb;
+  --divider: rgba(15, 23, 42, 0.06);
+  --shadow-soft: 0 20px 45px rgba(15, 23, 42, 0.08);
+
   --accent-nav-active: #0a8168;
-  --bg-nav-active: rgba(10, 129, 104, 0.08);
+  --bg-nav-active: linear-gradient(135deg, rgba(10, 129, 104, 0.16), rgba(0, 216, 255, 0.12));
   --icon-nav-active: #0a8168;
-  --icon-nav-inactive: #8e8e93;
-  
-  /* 🌙 Dark Mode - Primary Colors (Override in dark-theme class) */
-  --bg-dark-main: #121214;
-  --bg-dark-header: #121214;
-  --bg-dark-secondary: #2a2a2d;
-  --bg-dark-border: #2a2a2a;
-  
-  /* 💡 Dark Mode - Text Colors */
-  --text-dark-main: #e5e5ea;
-  --text-dark-secondary: #a1a1a6;
-  --text-dark-muted: #8e8e93;
-  
-  /* ✨ Dark Mode - Neon Colors */
+  --icon-nav-inactive: #6b7280;
+
   --neon-blue: #00f5ff;
   --neon-yellow: #ffb703;
-  --neon-pink: #ff006e;
+  --neon-pink: #ff5a7d;
   --neon-purple: #b537f2;
-  
-  /* 🌟 Neon Glow Effects */
-  --glow-blue: #00f5ff;
-  --glow-yellow: #ffb703;
-  
-  /* 🎯 Legacy/Fallback Colors */
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
+  --accent: #0a8168;
+  --accent-cyan: #00d8ff;
+  --accent-yellow: #ffb703;
   --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-  
-  /* 📚 Typography */
-  --sans: system-ui, 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text-main);
-  background: var(--bg-main);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   🌙 DARK MODE - CYBERPUNK DOFF & GLOW THEME (APPLIED VIA CLASS)
-   ════════════════════════════════════════════════════════════════════ */
 body.dark-theme {
-  /* 🌑 Dark Mode - Primary Colors */
-  --bg-main: #121214;
-  --bg-header: #121214;
-  --bg-secondary: #1a1a1d;
-  --bg-input: #2a2a2d;
-  --bg-sidebar: #121214;
-  
-  /* 📝 Dark Mode - Text Colors */
-  --text-main: #e5e5ea;
-  --text-secondary: #a1a1a6;
-  --text-muted: #8e8e93;
-  
-  /* 🟢 Dark Mode - Accent (Neon Blue Override) */
-  --accent-emerald: #00f5ff;
-  --accent-emerald-light: #00ffff;
-  --accent-emerald-hover: #00d9dd;
-  
-  /* ✨ Dark Mode - Border & Divider */
-  --border-light: #2a2a2a;
-  --border-medium: #3a3a3c;
-  --divider: rgba(255, 255, 255, 0.05);
+  --bg-main: linear-gradient(145deg, #060816 0%, #0f172a 45%, #131b2c 100%);
+  --bg-header: rgba(10, 15, 27, 0.9);
+  --bg-toggle: rgba(17, 24, 39, 0.88);
+  --bg-input: #111827;
+  --bg-sidebar: #0b1120;
+  --bg-surface: #131a2b;
 
-  /* 🕹️ Navigation Active States in Dark Mode */
-  --accent-nav-active: #ffb703;
-  --bg-nav-active: rgba(255, 183, 3, 0.1);
-  --icon-nav-active: #ffb703;
-  --icon-nav-inactive: #8e8e93;
-  
-  /* 🌈 Override Legacy Variables */
-  --text: #e5e5ea;
-  --text-h: #e5e5ea;
-  --bg: #121214;
-  --border: #2a2a2a;
-  --code-bg: #1f1f23;
-  --accent: #00f5ff;
-  --accent-bg: rgba(0, 245, 255, 0.1);
-  --accent-border: rgba(0, 245, 255, 0.3);
-  --social-bg: rgba(42, 42, 45, 0.8);
-  --shadow: rgba(0, 0, 0, 0.8) 0 10px 15px -3px, rgba(0, 0, 0, 0.5) 0 4px 6px -2px;
-  
+  --text-main: #f3f7ff;
+  --text-secondary: #9fb7d9;
+  --text-muted: #6f7f99;
+
+  --accent: #4f8cff;
+  --accent-strong: #3f77ff;
+  --accent-cyan: #34d5ff;
+  --accent-yellow: #f7c948;
+  --accent-pink: #ff6da0;
+  --accent-emerald: var(--accent);
+  --accent-soft: rgba(79, 140, 255, 0.18);
+
+  --accent-nav-active: var(--accent-cyan);
+  --bg-nav-active: linear-gradient(135deg, rgba(79, 140, 255, 0.22), rgba(52, 213, 255, 0.16));
+  --icon-nav-active: var(--accent-cyan);
+  --icon-nav-inactive: #8a94a8;
+
+  --border-light: rgba(148, 163, 184, 0.16);
+  --border-medium: rgba(148, 163, 184, 0.24);
+  --divider: rgba(255, 255, 255, 0.06);
+  --shadow-soft: 0 18px 40px rgba(2, 8, 23, 0.45);
+
+  --neon-blue: var(--accent);
+  --neon-cyan: var(--accent-cyan);
+
   color-scheme: dark;
 }
 
-body {
+html, body {
   margin: 0;
+  padding: 0;
+  font-family: var(--sans);
+  background: var(--bg-main) !important;
+  color: var(--text-main) !important;
+  transition: background 0.3s ease, color 0.3s ease;
+  min-height: 100%;
+}
+
+body {
+  background-attachment: fixed;
 }
 
 #root {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  background: transparent !important;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
+/* Typography & Elements Utilities */
+h1, h2 {
+  font-weight: 700;
   color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
   margin: 0;
 }
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+p { margin: 0; }
 
 code {
-  font-size: 15px;
-  line-height: 135%;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 14px;
   padding: 4px 8px;
   background: var(--code-bg);
+  border-radius: 4px;
+}
+
+/* Debug-friendly layout: do not hide app on desktop */
+@media (min-width: 769px) {
+  #root {
+    display: flex !important;
+  }
+
+  body::before {
+    content: "";
+    display: none;
+  }
 }

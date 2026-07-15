@@ -1,37 +1,54 @@
-/* ── 🎨 STYLE GLOBAL WARUNG HAERUDIN ── */
+/* ── 🎨 STYLE GLOBAL WARUNG HAERUDIN (FINAL CYAN-BLUE OBSIDIAN) ── */
 
 :root {
-  /* LIGHT MODE */
+  /* ☀️ TEMA SIANG (Light Matte) */
+  --bg-luar: #f7f8fa;        /* Background monitor luar PC */
+  --bg-body: #ffffff;        /* Kanvas Utama HP wajib Putih Bersih */
   --bg-header: #ffffff;
-  --bg-body: #f7f8fa;
-  --text-main: #1c1c1e;
-  --text-muted: #8e8e93;
+  --bg-toggle: #f2f2f7;      /* Boks menu saat siang (abu-abu super light) */
+  --surface: #ffffff;
+  --text-main: #1c1c1e;      /* Teks hitam pekat */
+  --text-secondary: #8e8e93; /* Abu-abu untuk deskripsi menu */
+  --text-muted: #a8a8ad;
+  --border-light: #eef0f3;
   --border-color: #eef0f3;
-  --border-thin: #f4f5f7;
-  --bg-toggle: #f2f2f7;
+  
+  /* 🔵 Neon Accent Siang */
+  --accent-neon: #0055ff;     /* ⚡ Biru Electric Utama */
+  --accent-cyan: #00bfd8;     /* Cyan sedikit diredam saat siang agar tidak silau */
+  --accent-glow: rgba(0, 85, 255, 0.05);
 }
 
 body.dark-theme {
-  /* DARK MODE */
-  --bg-header: #1a1a1e;
-  --bg-body: #121214;
-  --text-main: #ffffff;
-  --text-muted: #9a9a9f;
-  --border-color: #2a2a2a;
-  --border-thin: #333333;
-  --bg-toggle: #2c2c2e;
+  /* 🌙 TEMA MALAM (Premium Matte Cyberpunk Obsidian) */
+  --bg-luar: #0a0c10;        /* Obsidian Base (Sangat deep untuk luar kanvas) */
+  --bg-body: #0a0c10;        /* 🎯 KUNCI: Kanvas Utama HP berubah jadi Hitam Obsidian */
+  --bg-header: #11141b;      /* Obsidian Surface */
+  --bg-toggle: #171c26;      /* Boks menu & status saat malam */
+  --surface: #171c26;
+  --text-main: #f5f7fa;      /* Teks jadi putih bersih adem */
+  --text-secondary: #94a1b8; /* Abu-abu terang untuk sub-menu malam */
+  --text-muted: #5c6984;
+  --border-light: #181d28;
+  --border-color: #181d28;
+  
+  /* 🌌 Neon Accent Malam */
+  --accent-neon: #0055ff;     /* ⚡ Biru Electric Utama tetap konsisten */
+  --accent-cyan: #00f5ff;     /* 🌌 Cyan Neon menyala tajam di malam hari */
+  --accent-glow: rgba(0, 245, 255, 0.15);
 }
 
+/* 🔒 PAKSA HTML & BODY MENGIKUTI TEMA LUAR */
 html, body {
   margin: 0;
   padding: 0;
   width: 100%;
   min-height: 100vh;
-  background-color: var(--bg-body) !important;
+  background-color: var(--bg-luar) !important;
   color: var(--text-main) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow-x: hidden !important;
-  transition: background-color 0.3s, color 0.3s;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 button {
@@ -39,6 +56,7 @@ button {
   outline: none;
 }
 
+/* ── 🕹️ CUSTOM SCROLLBAR PREMIUM (ADAPTIF SIANG MALAM) ── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -49,12 +67,13 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--text-muted);
   border-radius: 10px;
+  opacity: 0.3;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--accent-cyan); /* Scrollbar menyala tipis saat disentuh */
 }
 
 .mainArea {

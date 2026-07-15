@@ -4,6 +4,12 @@
   padding: 0 4px;
 }
 
+/* Mobile-first wrapper: constrain to phone width */
+.container {
+  max-width: 480px; /* typical phone width */
+  margin: 0 auto;
+}
+
 /* 🕹️ HEADER NAVIGASI TAB */
 .tabHeader {
   position: sticky;
@@ -366,33 +372,38 @@
   /* Pas HP, satukan bagian counter dan bagian harga agar berjejer mendatar kompak */
   /* Kita ubah rightSection agar bergabung mulus dengan centerSection di baris bawah */
   .itemBelanja {
-    display: block;               /* Kembalikan ke block agar susunan div mengalir natural */
+    display: flex;               /* Mobile: gunakan flex column untuk susunan lebih stabil */
+    flex-direction: column;
+    align-items: stretch;
   }
-  
+
   .infoNama {
     display: block;
     margin-bottom: 10px;
   }
 
-  /* Bungkus baris bawah secara fleksibel horizontal */
+  /* Baris bawah: gunakan Flexbox untuk menyusun counter di kiri dan harga di kanan */
+  .bottomRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
   .centerSection {
-    float: left;                  /* Dorong counter ke sisi kiri bawah */
-    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .rightSection {
-    float: right;                 /* Dorong harga-harga ke sisi kanan bawah */
-    width: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     border-top: none;
     padding-top: 0;
     margin-top: 2px;
-  }
-
-  /* Clearfix otomatis agar tinggi card putih tidak ambles akibat float */
-  .itemBelanja::after {
-    content: "";
-    clear: both;
-    display: table;
   }
 
   /* Tombol silang diposisikan absolut permanen di pojok kanan atas card */

@@ -6,387 +6,40 @@ import Header from './component/header/Header.jsx';
 import BelanjaAgen from './pages/BelanjaAgen/BelanjaAgen.jsx';
 import HistoryWarung from './pages/History/HistoryWarung.jsx';
 import RightSidebar from './component/sidebar/RightSidebar.jsx';
-import './global.css'; // 🎯 Pastikan diimport sebagai CSS biasa, bukan module!
+import './global.css';
 
-// ⚡ IMPOR FIREBASE DATABASE
-import { db } from './firebase.js';
-import { ref, onValue, set } from 'firebase/database';
-
-const STORAGE_KEYS = {
-  barang: 'warung_daftar_barang',
-  history: 'warung_history_belanja',
-  logHarga: 'warung_log_perubahan_harga'
-};
+// 🎯 IMPORT CUSTOM HOOK GUDANG GLOBAL
+import { useAppGudang } from './context/useAppGudang.jsx';
+import DaftarWarung from './pages/DaftarWarung/DaftarWarung.jsx';
 
 const MOBILE_BREAKPOINT = 768;
 
-const readStoredState = (key, fallback) => {
-  if (typeof window === 'undefined') return fallback;
-
-  try {
-    const savedValue = localStorage.getItem(key);
-    return savedValue ? JSON.parse(savedValue) : fallback;
-  } catch (error) {
-    console.warn(`Gagal membaca ${key}:`, error);
-    return fallback;
-  }
-};
-
 function App() {
+  // 🔒 STATE LOKAL KHUSUS UI
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= MOBILE_BREAKPOINT);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const lastScrollYRef = useRef(0);
-  const [showBackToTop, setShowBackToTop] = useState(false);
-
-  // 🟢 LOGIKA OFFLINE-FIRST: Ambil data lokal dulu pas pertama aplikasi dibuka (Biar Instan!)
-  const [daftarBarang, setDaftarBarang] = useState(() => readStoredState(STORAGE_KEYS.barang, []));
-  const [historyBelanja, setHistoryBelanja] = useState(() => readStoredState(STORAGE_KEYS.history, []));
-  const [logPerubahanHarga, setLogPerubahanHarga] = useState(() => readStoredState(STORAGE_KEYS.logHarga, []));
-
-  const persistAndSync = useCallback((key, value) => {
-    localStorage.setItem(key, JSON.stringify(value));
-    set(ref(db, key), value);
-  }, []);
-
-  // ── 🔄 SINKRONISASI REALTIME DARI FIREBASE (MENIMPA LOKAL JIKA ONLINE) ──
-  useEffect(() => {
-    const subscribeToPath = (path, key, setter) => onValue(ref(db, path), (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setter(data);
-        localStorage.setItem(key, JSON.stringify(data));
-      }
-    });
-
-    const unsubBarang = subscribeToPath('warung_daftar_barang', STORAGE_KEYS.barang, setDaftarBarang);
-    const unsubHistory = subscribeToPath('warung_history_belanja', STORAGE_KEYS.history, setHistoryBelanja);
-    const unsubLog = subscribeToPath('warung_log_perubahan_harga', STORAGE_KEYS.logHarga, setLogPerubahanHarga);
-
-    return () => {
-      unsubBarang();
-      unsubHistory();
-      unsubLog();
-    };
-  }, []);
-
-  // ── 🔧 HELPER KONVERSI GROSIR AMAN ──
-  const perPieceFromTotal = (total, units) => {
-    const t = Number(total) || 0;
-    const u = Math.max(1, Number(units) || 1);
-    return Math.ceil(t / u); // 🎯 Maksa ke atas
-  };
-
-  // ── LOGIKA MUTASI DATA BARANG + SYNC KE FIREBASE ──
-  const handleTambahBarang = useCallback((barangBaru) => {
-    setDaftarBarang((prevBarang) => {
-      const updateData = [...prevBarang, { ...barangBaru, id: Date.now() }];
-      persistAndSync(STORAGE_KEYS.barang, updateData);
-      return updateData;
-    });
-  }, [persistAndSync]);
-
-  const handleEditBarang = useCallback((id, dataDiperbarui) => {
-    setDaftarBarang((prevBarang) => {
-      const updateData = prevBarang.map((barang) =>
-        barang.id === id ? { ...barang, ...dataDiperbarui } : barang
-      );
-      persistAndSync(STORAGE_KEYS.barang, updateData);
-      return updateData;
-    });
-  }, [persistAndSync]);
-
-  const handleHapusBarang = useCallback((id) => {
-    if (window.confirm('Yakin mau hapus barang ini dari toko, Fi?')) {
-      setDaftarBarang((prevBarang) => {
-        const updateData = prevBarang.filter((barang) => barang.id !== id);
-        persistAndSync(STORAGE_KEYS.barang, updateData);
-        return updateData;
-      });
-    }
-  }, [persistAndSync]);
-
-  // ── 🛠️ FUNGSI AUTO-SYNC HARGA MODAL (SINKRON KE FIREBASE & LOG) ──
-  const handleUpdateHargaModal = useCallback((idBarang, hargaModalBaru, satuanBeliAgen = 'Pcs', prevModal = null) => {
-    let logBaruBaru = null;
-    let daftarBarangTerupdate = [];
-
-    setDaftarBarang((prevBarang) => {
-      daftarBarangTerupdate = prevBarang.map((barang) => {
-        if (barang.id === idBarang) {
-          let modalEceranTerkecil;
-
-          if (['Dus', 'Karton', 'Bal'].includes(satuanBeliAgen)) {
-            const isiPerDus = Number(barang.minimalBeliGrosirBesar) || 40;
-            modalEceranTerkecil = perPieceFromTotal(hargaModalBaru, isiPerDus);
-          } else if (['Renteng', 'Pack', 'Slop'].includes(satuanBeliAgen)) {
-            const isiPerRenteng = Number(barang.minimalBeliGrosir) || 10;
-            modalEceranTerkecil = perPieceFromTotal(hargaModalBaru, isiPerRenteng);
-          } else {
-            modalEceranTerkecil = Math.ceil(Number(hargaModalBaru) || 0);
-          }
-
-          const modalLamaUntukLog = prevModal !== null ? Number(prevModal) : (barang.modal || 0);
-          if (modalLamaUntukLog !== modalEceranTerkecil) {
-            logBaruBaru = {
-              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-              namaBarang: barang.nama,
-              modalLama: modalLamaUntukLog,
-              modalBaru: modalEceranTerkecil
-            };
-          }
-          return { ...barang, modal: modalEceranTerkecil };
-        }
-        return barang;
-      });
-
-      persistAndSync(STORAGE_KEYS.barang, daftarBarangTerupdate);
-      return daftarBarangTerupdate;
-    });
-
-    if (logBaruBaru) {
-      setLogPerubahanHarga((prevLog) => {
-        const updateLog = [logBaruBaru, ...prevLog];
-        persistAndSync(STORAGE_KEYS.logHarga, updateLog);
-        return updateLog;
-      });
-    }
-  }, [persistAndSync]);
-
-  const addLogPerubahanHarga = useCallback(({ namaBarang, modalLama, modalBaru }) => {
-    if (modalLama === modalBaru) return;
-    const entry = {
-      idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-      namaBarang: namaBarang || 'Unknown',
-      modalLama: Number(modalLama) || 0,
-      modalBaru: Number(modalBaru) || 0
-    };
-    setLogPerubahanHarga((prev) => {
-      const updateLog = [entry, ...prev];
-      persistAndSync(STORAGE_KEYS.logHarga, updateLog);
-      return updateLog;
-    });
-  }, [persistAndSync]);
-
-  // ── ✏️ FUNGSI KOREKSI NOTA KULAKAN (SINKRON GUDANG + 🎯 FIX AUTO TRIGGER LOG HARGA) ──
-  const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
-    setHistoryBelanja((prevHistory) => {
-      const historyUpdate = prevHistory.map((nota) => {
-        if (nota.id === idNota) {
-          return { ...nota, items: itemsDiperbarui, totalPengeluarannya: totalPengeluaranBaru };
-        }
-        return nota;
-      });
-      persistAndSync(STORAGE_KEYS.history, historyUpdate);
-      return historyUpdate;
-    });
-
-    const logAntreanBaru = [];
-
-    setDaftarBarang((prevBarang) => {
-      const barangUpdate = prevBarang.map((barang) => {
-        const itemKoreksi = itemsDiperbarui.find((item) => item.id === barang.id);
-        
-        if (itemKoreksi) {
-          const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
-          const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
-          
-          const isiGrosirMenengah = Number(barang.minimalBeliGrosir) || 10;
-          const modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * isiGrosirMenengah);
-
-          // 🎯 DETEKSI PERUBAHAN HARGA NOTA AGEN: Dorong ke Riwayat Harga
-          const hargaAgenLama = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
-          
-          if (hargaNotaAgenBaru !== hargaAgenLama && hargaAgenLama > 0) {
-            logAntreanBaru.push({
-              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-              namaBarang: barang.nama,
-              modalLama: hargaAgenLama,
-              modalBaru: hargaNotaAgenBaru
-            });
-          }
-
-          return {
-            ...barang,
-            modal: modalEceranBaru,
-            hargaModalAgen: hargaNotaAgenBaru,
-            modalGrosirTotal: modalGrosirMenengahBaru,
-            jualGrosirBesarTotal: hargaNotaAgenBaru
-          };
-        }
-        return barang;
-      });
-
-      persistAndSync(STORAGE_KEYS.barang, barangUpdate);
-      return barangUpdate;
-    });
-
-    if (logAntreanBaru.length > 0) {
-      setLogPerubahanHarga((prevLog) => {
-        const updateLog = [...logAntreanBaru, ...prevLog];
-        persistAndSync(STORAGE_KEYS.logHarga, updateLog);
-        return updateLog;
-      });
-    }
-  }, [persistAndSync]);
-
-  // 📅 FUNGSI TAMBAH HISTORY BELANJAAN
-  const handleTambahHistoryBelanja = useCallback((keranjangData) => {
-    const notaBaru = {
-      id: `NOTA-${Date.now()}`,
-      tanggal: new Date().toLocaleDateString('id-ID', {
-        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-      }),
-      items: keranjangData,
-      totalPengeluarannya: keranjangData.reduce((sum, item) => sum + (item.modalBaru * item.qty), 0)
-    };
-    setHistoryBelanja((prevHistory) => {
-      const historyTerbaru = [notaBaru, ...prevHistory];
-      const batasWaktu = Date.now() - (15 * 24 * 60 * 60 * 1000);
-      const historyFiltered = historyTerbaru.filter((nota) => {
-        const idTimestamp = Number(nota.id.split('-')[1]);
-        return idTimestamp > batasWaktu;
-      });
-
-      persistAndSync(STORAGE_KEYS.history, historyFiltered);
-      return historyFiltered;
-    });
-  }, [persistAndSync]);
-
-  // 🚀 FUNGSI ADAPTER FIRESTORE LAMA
-  const handleMigrasiDataFirestore = useCallback((dataFirestoreLama) => {
-    try {
-      const tebakKategoriDariNama = (namaBarang) => {
-        const namaKecil = (namaBarang || '').toLowerCase();
-        if (
-          namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || 
-          namaKecil.includes('surya') || namaKecil.includes('djarum') || namaKecil.includes('samsoet') || 
-          namaKecil.includes('sampoerna') || namaKecil.includes('magnum') || namaKecil.includes('korek') ||
-          namaKecil.includes('gg') || namaKecil.includes('ji sam soe') || namaKecil.includes('bold')
-        ) return 'Rokok/Korek';
-        if (namaKecil.includes('mie') || namaKecil.includes('indomie') || namaKecil.includes('sedaap') || namaKecil.includes('intermie') || namaKecil.includes('sarimi')) return 'Mie/Instan';
-        if (namaKecil.includes('kopi') || namaKecil.includes('kapal api') || namaKecil.includes('teh') || namaKecil.includes('susu') || namaKecil.includes('aqua') || namaKecil.includes('vit')) return 'Minuman/Kopi/Susu';
-        if (namaKecil.includes('sabun') || namaKecil.includes('sampo') || namaKecil.includes('rinso') || namaKecil.includes('biore') || namaKecil.includes('sunlight')) return 'Sabun/Pembersih';
-        if (namaKecil.includes('chiki') || namaKecil.includes('snack') || namaKecil.includes('wafer') || namaKecil.includes('oreo') || namaKecil.includes('roti') || namaKecil.includes('apel')) return 'Snack/Biskuit/Roti';
-        if (namaKecil.includes('promag') || namaKecil.includes('bodrex') || namaKecil.includes('obat') || namaKecil.includes('panadol') || namaKecil.includes('paramex')) return 'Obat-obatan/Medical item';
-        if (namaKecil.includes('plastik') || namaKecil.includes('cup') || namaKecil.includes('gelas') || namaKecil.includes('kantong')) return 'plastik/Cup';
-        if (namaKecil.includes('beras') || namaKecil.includes('gula') || namaKecil.includes('terigu') || namaKecil.includes('minyak') || namaKecil.includes('bumbu') || namaKecil.includes('aci')) return 'Sembako/Dapur';
-        return 'item lain';
-      };
-
-      const dataHasilKonversi = dataFirestoreLama.map((itemLama) => {
-        const namaKecil = (itemLama.nama || '').toLowerCase();
-        const kategoriAsliAtauNama = itemLama.kategori || itemLama.nama || '';
-        const kategoriLower = kategoriAsliAtauNama.toLowerCase();
-        
-        const isRokok = namaKecil.includes('rokok') || namaKecil.includes('filter') || namaKecil.includes('mild') || namaKecil.includes('surya') || kategoriLower.includes('rokok') || kategoriLower.includes('korek');
-        const isSembakoCurah = namaKecil.includes('beras') || namaKecil.includes('gula') || namaKecil.includes('terigu') || namaKecil.includes('aci') || namaKecil.includes('gunung');
-
-        let minimalGrosirBesarDefault = Number(itemLama.minimalBeliGrosirBesar || itemLama.isiSatuan || itemLama.isiPerSatuan || (isSembakoCurah ? 25 : 40));
-        if (minimalGrosirBesarDefault <= 1) minimalGrosirBesarDefault = isSembakoCurah ? 25 : 40;
-
-        let modalEceranAwal = 0;
-        if (itemLama.modalEceran !== undefined) {
-          modalEceranAwal = Number(itemLama.modalEceran);
-        } else if (itemLama.modal !== undefined) {
-          modalEceranAwal = Number(itemLama.modal);
-        } else if (itemLama.hargaAgen !== undefined && itemLama.hargaAgen > 0) {
-          modalEceranAwal = Math.round(Number(itemLama.hargaAgen) / minimalGrosirBesarDefault);
-        }
-
-        const totalHargaAgen = Number(itemLama.hargaAgen || itemLama.jualGrosirBesarTotal || (modalEceranAwal * minimalGrosirBesarDefault));
-
-        let hargaJualMurni = Number(itemLama.hargaEceran || itemLama.jual || itemLama.hargaJual || 0);
-        if (hargaJualMurni === 0) {
-          const hargaMentah = modalEceranAwal * 1.15;
-          hargaJualMurni = Math.ceil(hargaMentah / 500) * 500;
-        } else {
-          hargaJualMurni = Math.round(hargaJualMurni);
-        }
-
-        let catatanGabungan = itemLama.catatan || '';
-        if (!catatanGabungan && (itemLama.catatanUtama || itemLama.catatanHarga)) {
-          catatanGabungan = [itemLama.catatanUtama || '', itemLama.catatanHarga || ''].filter(Boolean).join(' | ');
-        }
-
-        let satuanModalFinal = itemLama.satuanBeli || itemLama.satuanModal || (isRokok ? 'Slop' : isSembakoCurah ? 'Karung/Sak' : 'Dus');
-        let satuanJualFinal = itemLama.satuanJual || (isRokok ? 'Bungkus' : isSembakoCurah ? 'Kg' : 'Pcs');
-
-        let kategoriFinal = itemLama.kategori || tebakKategoriDariNama(itemLama.nama);
-        const cekLower = kategoriFinal.toLowerCase();
-        if (cekLower.includes('medical') || cekLower.includes('obat')) {
-          kategoriFinal = 'Obat-obatan/Medical item';
-        } else if (cekLower.includes('minuman') || cekLower.includes('kopi') || cekLower.includes('susu')) {
-          kategoriFinal = 'Minuman/Kopi/Susu';
-        } else if (cekLower.includes('snack') || cekLower.includes('roti') || cekLower.includes('biskuit')) {
-          kategoriFinal = 'Snack/Biskuit/Roti';
-        } else if (cekLower.includes('sabun') || cekLower.includes('bersih') || cekLower.includes('pembersih')) {
-          kategoriFinal = 'Sabun/Pembersih';
-        } else if (cekLower.includes('plastik') || cekLower.includes('cup')) {
-          kategoriFinal = 'plastik/Cup';
-        } else if (cekLower.includes('mie') || cekLower.includes('instan')) {
-          kategoriFinal = 'Mie/Instan';
-        } else if (cekLower.includes('sembako') || cekLower.includes('dapur')) {
-          kategoriFinal = 'Sembako/Dapur';
-        } else if (cekLower.includes('rokok') || cekLower.includes('korek')) {
-          kategoriFinal = 'Rokok/Korek';
-        }
-
-        return {
-          id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          nama: itemLama.nama || 'Tanpa Nama',
-          modal: modalEceranAwal, 
-          hargaModalAgen: totalHargaAgen,
-          jual: hargaJualMurni,
-          satuanModal: satuanModalFinal,
-          satuanJual: satuanJualFinal,
-          isiGrosirBesar: minimalGrosirBesarDefault,
-          varian: itemLama.varian || [],
-          bisaGrosir: true,
-          minimalBeliGrosir: Number(itemLama.minimalBeliGrosir) || 10,
-          satuanGrosirNama: isRokok ? 'Slop' : 'Kotak/Renteng',
-          jualGrosir: Math.round(modalEceranAwal * 1.05),
-          bisaGrosirBesar: !isRokok,
-          minimalBeliGrosirBesar: minimalGrosirBesarDefault,
-          satuanGrosirBesarNama: satuanModalFinal,
-          jualGrosirBesarTotal: totalHargaAgen,
-          jualGrosirBesarPerPcs: modalEceranAwal,
-          catatan: catatanGabungan,
-          stok: Number(itemLama.stok || 0),
-          kategori: kategoriFinal
-        };
-      });
-
-      const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
-
-      setDaftarBarang(dataSudahUrutAZ);
-      persistAndSync(STORAGE_KEYS.barang, dataSudahUrutAZ);
-
-      alert(`✅ Berhasil Sempurna! ${dataSudahUrutAZ.length} barang rapi berurutan A-Z di Firebase & Laci!`);
-    } catch (error) {
-      console.error("Eror konversi data:", error);
-      alert("❌ Waduh gagal konversi data, cek log konsol!");
-    }
-  }, [persistAndSync]);
-
   const [activePage, setActivePage] = useState(() => window.innerWidth <= MOBILE_BREAKPOINT ? 'dashboard' : 'buku-warung');
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const lastScrollYRef = useRef(0);
 
+  // 🌐 AMBIL DATA DAN FUNGSI DARI GUDANG PUSAT CONTEXT
+  const { 
+    daftarBarang, userWarung, historyBelanja, logPerubahanHarga, isDark, toggleTheme,
+    handleTambahBarang, handleEditBarang, handleHapusBarang,
+    handleUpdateHargaModal, addLogPerubahanHarga, handleKoreksiNota,
+    handleTambahHistoryBelanja, handleMigrasiDataFirestore
+  } = useAppGudang();
+
+  // 🔄 1. MENJAGA KESELAMATAN HOOKS (Ditempatkan sebelum kondisi IF)
   useEffect(() => {
     const handleResize = () => {
       const mobileStatus = window.innerWidth <= MOBILE_BREAKPOINT;
       setIsMobile(mobileStatus);
-      if (!mobileStatus) {
-        setIsScrolled(false);
-        setShowBackToTop(false);
-      }
+      if (!mobileStatus) setShowBackToTop(false);
     };
 
     const handleScroll = () => {
       if (window.innerWidth <= MOBILE_BREAKPOINT) {
         const currentScrollY = window.scrollY;
-        setIsScrolled(currentScrollY > 30);
         const isScrollingUp = currentScrollY > 120 && currentScrollY < lastScrollYRef.current;
         setShowBackToTop(isScrollingUp);
         lastScrollYRef.current = currentScrollY;
@@ -397,7 +50,6 @@ function App() {
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('scroll', handleScroll);
-
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('scroll', handleScroll);
@@ -409,21 +61,19 @@ function App() {
   const renderMainContent = useCallback(() => {
     if (isMobile && activePage === 'dashboard') {
       return (
-        <div style={{ 
-          boxSizing: 'border-box', width: '100%', backgroundColor: 'var(--bg-body)', minHeight: '100vh',
-          position: 'fixed', top: 'calc(var(--dynamic-header-height, 210px) + 12px)', left: 0,
-          height: 'calc(100vh - calc(var(--dynamic-header-height, 210px) + 12px))', 
-          overflowY: 'auto', padding: '20px 16px 80px 16px',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="#0a8168" style={{ filter: 'drop-shadow(0 0 4px rgba(10,129,104,0.3))' }}>
-              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-            </svg>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-main)' }}>Menu Utama</h2>
+        <div style={{ boxSizing: 'border-box', width: '100%', backgroundColor: 'var(--bg-body)', minHeight: '100vh', padding: '0px 16px 100px 16px' }}>
+          <div style={{ background: 'var(--bg-toggle)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: '700', letterSpacing: '0.8px' }}>STATUS GUDANG WARUNG</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
+              <span style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--accent-cyan)', textShadow: '0 0 12px rgba(0, 245, 255, 0.3)' }}>{daftarBarang.length}</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '700' }}>Item Produk</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingLeft: '4px' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent-neon)"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10-8h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1z"/></svg>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-main)' }}>Menu Utama</h2>
           </div>
           <MainMenuNav halamanAktif={activePage} onMenuClick={handleMenuClick} />
-          <div style={{ height: '60px' }}></div>
         </div>
       );
     }
@@ -431,20 +81,8 @@ function App() {
     if (activePage === 'belanja' || (!isMobile && activePage === 'dashboard')) {
       return (
         <div style={{ paddingTop: !isMobile ? '20px' : '0' }}>
-          <BelanjaAgen 
-            daftarBarang={daftarBarang}
-            onUpdateHargaModal={handleUpdateHargaModal}
-            /* 🎯 FIX MUTLAK HURUF h KECIL SESUAI DEKLARASI STATE ATAS */
-            onTambahHistoryBelanja={handleTambahHistoryBelanja}
-          />
-          {isMobile && (
-            <button 
-              onClick={() => setActivePage('dashboard')} 
-              style={{ marginTop: '16px', padding: '10px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '10px', width: '100%', fontWeight: '700', fontSize: '0.9rem' }}
-            >
-              ⬅ Kembali ke Dashboard Utama
-            </button>
-          )}
+          <BelanjaAgen daftarBarang={daftarBarang} onUpdateHargaModal={handleUpdateHargaModal} onTambahHistoryBelanja={handleTambahHistoryBelanja} />
+          {isMobile && <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '16px', padding: '10px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '10px', width: '100%', fontWeight: '700' }}>⬅ Kembali ke Dashboard Utama</button>}
         </div>
       );
     }
@@ -452,23 +90,8 @@ function App() {
     if (activePage === 'buku-warung') {
       return (
         <>
-          <BukuWarung   
-            daftarBarang={daftarBarang} 
-            onTambahBarang={handleTambahBarang}
-            onEditBarang={handleEditBarang}
-            onHapusBarang={handleHapusBarang} 
-            onMigrasiFirestore={handleMigrasiDataFirestore}
-            onUpdateHargaModal={handleUpdateHargaModal}
-            onAddLogPerubahanHarga={addLogPerubahanHarga}
-          />
-          {isMobile && (
-            <button 
-              onClick={() => setActivePage('dashboard')} 
-              style={{ marginTop: '20px', padding: '10px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px', width: '100%', fontWeight: '500' }}
-            >
-              ⬅ Kembali ke Dashboard Utama
-            </button>
-          )}
+          <BukuWarung daftarBarang={daftarBarang} onTambahBarang={handleTambahBarang} onEditBarang={handleEditBarang} onHapusBarang={handleHapusBarang} onMigrasiFirestore={handleMigrasiDataFirestore} onUpdateHargaModal={handleUpdateHargaModal} onAddLogPerubahanHarga={addLogPerubahanHarga} />
+          {isMobile && <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '10px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px', width: '100%', fontWeight: '500' }}>⬅ Kembali ke Dashboard Utama</button>}
         </>
       );
     }
@@ -476,88 +99,42 @@ function App() {
     if (activePage === 'history') { 
       return (
         <div style={{ paddingTop: !isMobile ? '20px' : '0' }}>
-          <HistoryWarung 
-            historyBelanja={historyBelanja} 
-            logPerubahanHarga={logPerubahanHarga}
-            onKoreksiNota={handleKoreksiNota}
-            daftarBarang={daftarBarang} 
-          />
-          {isMobile && (
-            <button 
-              onClick={() => setActivePage('dashboard')} 
-              style={{ marginTop: '16px', padding: '10px 16px', background: '#2a2a2a', border: 'none', color: '#fff', borderRadius: '10px', width: '100%', fontWeight: '700' }}
-            >
-              ⬅ Kembali ke Dashboard Utama
-            </button>
-          )}
-        </div>
-      );
-    }
-
-    if (activePage === 'kasir') {
-      return (
-        <div style={{ padding: '20px 0', textAlign: 'center' }}>
-          <h3>🎰 Modul Kasir</h3>
-          <p style={{ color: 'var(--text-muted)' }}>Menu ini dinonaktifkan sementara karena kamu lebih cepat pakai manual! ⚡</p>
-          {isMobile && <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px' }}>Kembali</button>}
+          <HistoryWarung historyBelanja={historyBelanja} logPerubahanHarga={logPerubahanHarga} onKoreksiNota={handleKoreksiNota} daftarBarang={daftarBarang} />
+          {isMobile && <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '16px', padding: '10px 16px', background: '#2a2a2a', border: 'none', color: '#fff', borderRadius: '10px', width: '100%', fontWeight: '700' }}>⬅ Kembali ke Dashboard Utama</button>}
         </div>
       );
     }
 
     return (
-      <div style={{ textAlign: 'center', padding: '40px' }}>
-        <h3>Modul {activePage} sedang dikembangkan</h3>
-        <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '6px' }}>Kembali</button>
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <h3>Modul Kasir & Lainnya</h3>
+        <p style={{ color: 'var(--text-muted)' }}>Operasional dialihkan sementara ⚡</p>
+        <button onClick={() => setActivePage('dashboard')} style={{ marginTop: '20px', padding: '8px 16px', background: 'var(--accent)', border: '#fff', color: '#fff', borderRadius: '6px' }}>Kembali</button>
       </div>
     );
   }, [isMobile, activePage, daftarBarang, historyBelanja, logPerubahanHarga, handleUpdateHargaModal, addLogPerubahanHarga, handleTambahHistoryBelanja, handleTambahBarang, handleEditBarang, handleHapusBarang, handleMigrasiDataFirestore, handleKoreksiNota, handleMenuClick]);
   
   const memoedMainContent = useMemo(() => renderMainContent(), [renderMainContent]);
 
+  // 🎯 2. PINDAHKAN GERBANG KE SINI (Setelah semua Hooks dideklarasikan dengan sah)
+  if (!userWarung) {
+    return <DaftarWarung />;
+  }
+
+  // 📦 3. RETURN LAYOUT UTAMA SEPERTI BIASA
   return (
     <DashboardLayout 
-      header={<Header activePage={activePage} isScrolled={isScrolled} daftarBarang={daftarBarang}/>}
+      header={<Header activePage={activePage} daftarBarang={daftarBarang} isDarkMode={isDark} onToggleDarkMode={toggleTheme} />}
       sidebar={
         isMobile ? (
-          activePage !== 'dashboard' ? (
-            <div style={{ 
-              position: 'fixed',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: '60px',
-              backgroundColor: 'var(--bg-header, #171a21)',
-              borderTop: '1px solid var(--border-color, #2f3643)',
-              display: 'flex', 
-              width: '100%', 
-              justifyContent: 'space-around', 
-              alignItems: 'center', 
-              padding: '0 10px',
-              boxSizing: 'border-box',
-              zIndex: 9999
-            }}>
-              <button onClick={() => setActivePage('dashboard')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'dashboard' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                </svg>
-              </button>
-              <button onClick={() => setActivePage('belanja')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'belanja' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-                  <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-                </svg>
-              </button>
-              <button onClick={() => setActivePage('history')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'history' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-                </svg>
-              </button>
-              <button onClick={() => setActivePage('buku-warung')} style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill={activePage === 'buku-warung' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}>
-                  <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.2 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 11.55V22"/>
-                </svg>
-              </button>
+          activePage !== 'dashboard' && (
+            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '74px', background: 'linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98))', borderTop: '1px solid var(--border-color)', display: 'flex', width: '100%', justifyContent: 'space-around', alignItems: 'center', zIndex: 9999, padding: '0 12px 8px 12px', backdropFilter: 'blur(16px)' }}>
+              <button onClick={() => setActivePage('dashboard')} style={{ background: activePage === 'dashboard' ? 'var(--bg-nav-active)' : 'transparent', border: 'none', padding: '8px 10px', borderRadius: '12px', minWidth: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="24" height="24" viewBox="0 0 24 24" fill={activePage === 'dashboard' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></button>
+              <button onClick={() => setActivePage('belanja')} style={{ background: activePage === 'belanja' ? 'var(--bg-nav-active)' : 'transparent', border: 'none', padding: '8px 10px', borderRadius: '12px', minWidth: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="24" height="24" viewBox="0 0 24 24" fill={activePage === 'belanja' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg></button>
+              <button onClick={() => setActivePage('history')} style={{ background: activePage === 'history' ? 'var(--bg-nav-active)' : 'transparent', border: 'none', padding: '8px 10px', borderRadius: '12px', minWidth: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="24" height="24" viewBox="0 0 24 24" fill={activePage === 'history' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg></button>
+              <button onClick={() => setActivePage('buku-warung')} style={{ background: activePage === 'buku-warung' ? 'var(--bg-nav-active)' : 'transparent', border: 'none', padding: '8px 10px', borderRadius: '12px', minWidth: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="24" height="24" viewBox="0 0 24 24" fill={activePage === 'buku-warung' ? 'var(--accent)' : 'var(--icon-nav-inactive)'}><path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.2 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 11.55V22"/></svg></button>
             </div>
-          ) : null
+          )
         ) : (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '240px', height: '100vh', backgroundColor: 'var(--bg-header)', borderRight: '1px solid var(--border-color)', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', zIndex: 90 }}>
             <p style={{ fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '15px' }}>NAVIGASI</p>
@@ -573,38 +150,11 @@ function App() {
         <div className="mainArea" style={{ position: 'relative' }}>
           {memoedMainContent}
           {isMobile && showBackToTop && (
-            <button
-              type="button"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              style={{
-                position: 'fixed',
-                bottom: '84px',
-                right: '16px',
-                zIndex: 10000,
-                width: '52px',
-                height: '52px',
-                borderRadius: '50%',
-                border: 'none',
-                background: 'linear-gradient(180deg, #0dbd97, #0a8168)',
-                color: '#fff',
-                boxShadow: '0 14px 30px rgba(10, 129, 104, 0.25)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.1rem'
-              }}
-            >
-              ⬆
-            </button>
+            <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: 'fixed', bottom: '84px', right: '16px', zIndex: 10000, width: '52px', height: '52px', borderRadius: '50%', border: 'none', background: 'linear-gradient(180deg, var(--accent-cyan), var(--accent-neon))', color: '#fff', boxShadow: '0 12px 24px rgba(0,85,255,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⬆</button>
           )}
         </div>
       }
-      rightPanel={
-        activePage === 'dashboard' ? null : (
-          <RightSidebar logPerubahanHarga={logPerubahanHarga} />
-        )
-      }
+      rightPanel={activePage === 'dashboard' ? null : <RightSidebar logPerubahanHarga={logPerubahanHarga} />}
     />
   );
 }

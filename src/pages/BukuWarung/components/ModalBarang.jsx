@@ -1,8 +1,14 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import styles from './ModalBarang.module.css'; // 🎯 Import module CSS baru
 
+// 🎯 1. IMPOR CUSTOM HOOK GUDANG PUSAT
+import { useAppGudang } from '../../../context/useAppGudang.jsx'; 
+
+// 🎯 2. HAPUS 'userWarung' DARI PROPS KARENA KITA TARIK LANGSUNG DARI PUSAT
 function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
+  // 🎯 3. TARIK DATA USER AKTIF DARI GUDANG PUSAT REALTIME
+  const { userWarung } = useAppGudang();
+
   const isEdit = modalMode === 'edit' && barangAktif;
 
   // ── 🍏 1. NAMA, KATEGORI & VARIAN BARANG ──
@@ -47,23 +53,21 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   if (!isOpen) return null;
 
-  // 🧮 LIVE CALCULATION SAKTI (DIAMANKAN KE NUMBER BULAT MATANG)
+  // 🧮 LIVE CALCULATION SAKTI
   const hargaNota = Number(hargaModalAgen) || 0;
   const totalIsiTerkecil = Number(isiKeEceran) || 1;
   const isiPerGrosirMenengah = Number(jumlahKonversiGrosir) || 1;
 
-  // 🎯 KUNCI AMAN: Menggunakan Math.ceil agar pembulatan modal SELALU KE ATAS
-const modalEceranTerkecil = hargaNota > 0 && totalIsiTerkecil > 0 ? Math.ceil(hargaNota / totalIsiTerkecil) : 0;
-const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosirMenengah);
+  const modalEceranTerkecil = hargaNota > 0 && totalIsiTerkecil > 0 ? Math.ceil(hargaNota / totalIsiTerkecil) : 0;
+  const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosirMenengah);
 
-  // 🛢️ HELPER KONVERSI KG KE LITER (MINYAK SAYUR)
+  // 🛢️ HELPER KONVERSI KG KE LITER
   const handleKonversiMinyak = () => {
     const beratKg = Number(isiKeEceran) || 0;
     if (beratKg <= 0) {
-      alert("Masukkan angka berat (Kg) di kotak isi eceran dulu, Fi!");
+      alert("Masukkan angka berat (Kg) di kotak isi eceran dulu, " + (userWarung ? userWarung.pemilik : 'Bos') + "!");
       return;
     }
-    // Rumus fisis: Liter = Kg / 0.92
     const hasilLiter = (beratKg / 0.92).toFixed(2);
     
     setIsiKeEceran(hasilLiter);
@@ -73,11 +77,10 @@ const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosi
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!nama) { 
-      alert("Nama Barang wajib diisi ya, Fi!"); 
+      alert("Nama Barang wajib diisi ya, " + (userWarung ? userWarung.pemilik : 'Bos') + "!"); 
       return; 
     }
 
-    // Eksekusi kirim data bersih final ke state induk gudang
     onSimpan({
       nama,
       kategori,
@@ -110,7 +113,7 @@ const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosi
     onClose();
   };
 
-  return createPortal(
+  return (
     <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
         
@@ -166,7 +169,6 @@ const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosi
               </div>
             </div>
 
-            {/* ⚡ TOMBOL FITUR KONVERSI KHUSUS MINYAK SAYUR */}
             {kategori === 'Sembako/Dapur' && (
               <div style={{ marginTop: '6px' }}>
                 <button
@@ -174,18 +176,19 @@ const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosi
                   onClick={handleKonversiMinyak}
                   style={{
                     width: '100%',
-                    padding: '6px 10px',
-                    backgroundColor: '#e6f4ea',
-                    border: '1px solid #137333',
-                    color: '#137333',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
+                    padding: '8px 10px',
+                    backgroundColor: 'var(--bg-nav-active, #e6f4ea)',
+                    border: '1px solid var(--accent-cyan, #137333)',
+                    color: 'var(--accent-cyan, #137333)',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
                     fontWeight: '700',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '4px'
+                    gap: '4px',
+                    transition: 'all 0.2s'
                   }}
                 >
                   🛢️ Konversi {isiKeEceran || 0} Kg ke Liter (Minyak Sayur)
@@ -243,7 +246,7 @@ const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosi
           </div>
 
           <div>
-            <span className={styles.inputLabel}>Catatan Tambahan (Opsional)</span>
+            <label className={styles.inputLabel}>Catatan Tambahan (Opsional)</label>
             <textarea 
               value={catatan} 
               onChange={(e) => setCatatan(e.target.value)} 
@@ -260,8 +263,7 @@ const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosi
         </form>
 
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
 

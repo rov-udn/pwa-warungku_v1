@@ -1,19 +1,28 @@
 import { memo, useMemo } from 'react';
 import styles from './SummaryCards.module.css';
 
-function SummaryCards({ daftarBarang = [], totalKategori = 0 }) {
-  // ── 📊 1. HITUNG DATA RIIL WARUNG HYBRID (MEMOIZED) ──
-  const { totalModal, totalJenisBarang } = useMemo(() => {
-    const list = Array.isArray(daftarBarang) ? daftarBarang : [];
-    const tm = list.reduce((sum, barang) => sum + (barang.modal || 0), 0);
-    const tj = list.length;
-    return { totalModal: tm, totalJenisBarang: tj };
-  }, [daftarBarang]);
+// 🎯 IMPOR CUSTOM HOOK GUDANG GLOBAL
+import { useAppGudang } from '../../context/useAppGudang.jsx'; 
 
-  /* ── 🛑 AMANKAN KODE LAMA YANG BELUM FULL DIGITAL (DI-NONAKTIFKAN) ──
-  const totalJual = daftarBarang.reduce((sum, barang) => sum + (barang.jual || 0), 0);
-  const totalCuan = totalJual - totalModal;
-  ─────────────────────────────────────────────────────────────────── */
+function SummaryCards({ daftarBarang: propsDaftarBarang }) {
+  
+  // Ambil data dari gudang pusat sebagai cadangan utama
+  const { daftarBarang: contextDaftarBarang } = useAppGudang();
+
+  // ── 📊 HITUNG DATA RIIL WARUNG (LOGIKAL FILTER DIPINDAH KE DALAM USEMEMO) ──
+  const { totalModal, totalJenisBarang } = useMemo(() => {
+    // 🎯 AMAN: Menentukan sumber data di dalam useMemo agar tidak memicu re-render eksternal
+    const dataMentah = propsDaftarBarang || contextDaftarBarang;
+    const list = Array.isArray(dataMentah) ? dataMentah : [];
+    
+    // Hitung total modal stok toko
+    const tm = list.reduce((sum, barang) => sum + (barang.modal || 0), 0);
+    
+    // Hitung total varian/jenis barang
+    const tj = list.length;
+
+    return { totalModal: tm, totalJenisBarang: tj };
+  }, [propsDaftarBarang, contextDaftarBarang]); // 🎯 Dependency diubah ke props & context aslinya
 
   return (
     <div className={styles.summaryGrid}>
@@ -39,30 +48,6 @@ function SummaryCards({ daftarBarang = [], totalKategori = 0 }) {
           {totalJenisBarang} <span className={styles.subtext}>Item</span>
         </div>
       </div>
-
-      {/* Kartu 3: Total Kategori Aktif (Glow Neon Style 🚀) */}
-      <div className={`${styles.card} ${styles.cardKategori} ${styles.fullWidthMobile}`}>
-        <div className={styles.cardHeader}>
-          <span className={styles.title}>TOTAL KATEGORI</span>
-          <span className={styles.icon}>🏷️</span>
-        </div>
-        <div className={styles.valueGlow}>
-          {totalKategori} <span className={styles.subtextKategori}>Kelompok</span>
-        </div>
-      </div>
-
-      {/* ── 🛑 AMANKAN HTML KARTU LAMA (DI-NONAKTIFKAN) ──
-      <div className={styles.card}>
-        <div className={styles.cardHeader}>
-          <span className={styles.title}>ESTIMASI OMSET</span>
-          <span className={styles.icon}>💰</span>
-        </div>
-        <div className={styles.value}>
-          <span className={styles.currency}>Rp </span>
-          {totalJual.toLocaleString('id-ID')}
-        </div>
-      </div>
-      ───────────────────────────────────────────────── */}
     </div>
   );
 }

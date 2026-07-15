@@ -1,68 +1,49 @@
-/* ── 🚀 KUNCI STICKY DI ATAS ELEMEN LAIN ── */
+/* ── 🚀 KUNCI STICKY DI ATAS ELEMEN LAIN (MOBILE PRESISI) ── */
 .stickyHeader {
   position: sticky;
+  /* 🛠️ SAKTI: Menyesuaikan langsung dengan tinggi laci header dinamis */
   top: calc(var(--dynamic-header-height, 210px) + var(--searchbar-offset, 8px));
   z-index: 80;
-  background-color: var(--surface, var(--bg-header, #ffffff));
-  padding: 10px 12px;
+  /* 🎯 MENGGUNAKAN VARIABEL TOGGLE (Obsidian Card pas malam, Putih pas siang) */
+  background-color: var(--bg-toggle, #ffffff);
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--border-color, #eef0f3);
-  border-radius: 14px;
-  box-shadow: 0 6px 16px var(--shadow-soft, rgba(15, 23, 42, 0.06));
+  padding: 12px 12px 10px 12px;
+  border: 1px solid var(--border-light, #eef0f3);
+  border-radius: 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
+  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s;
 }
 
-/* ── 📱 VERSI MOBILE / HP ── */
-@media (max-width: 768px) {
-  .stickyHeader {
-    position: sticky !important;
-    top: calc(var(--dynamic-header-height, 210px) + var(--searchbar-offset, 8px)) !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    z-index: 80 !important;
-    padding: 12px 12px 10px 12px !important;
-    border-radius: 16px !important;
-    margin-bottom: 10px !important;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
-  }
-
-  .searchRow {
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .searchBar {
-    padding: 14px 16px;
-    border-radius: 14px;
-    font-size: 0.96rem;
-  }
-
-  .btnKategoriPill {
-    padding: 8px 16px;
-    font-size: 0.84rem;
-  }
-}
-
-/* 📊 BARIS PENCARIAN & TOMBOL */
+/* 📊 BARIS PENCARIAN & ACTION BUTTONS (ADAPTIF CHILDREN) */
 .searchRow {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  flex-direction: column; 
+  gap: 10px;
+  margin-bottom: 14px;
   width: 100%;
 }
 
 .searchBar {
-  flex: 1;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color, #eef0f3);
-  background-color: var(--bg-header, #ffffff);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 0.96rem;
+  border: 1px solid var(--border-light, #eef0f3);
+  /* 🎯 MENGGUNAKAN VARIABEL INPUT OBSIDIAN AGAR LEBIH DEEP SAAT MALAM */
+  background-color: var(--bg-input, #f2f2f7); 
   color: var(--text-main, #1c1c1e);
-  font-size: 0.9rem;
   outline: none;
+  transition: all 0.2s ease;
+}
+
+.searchBar:focus {
+  /* 🎯 BERUBAH JADI BIRU ELECTRIC + GLOW CYAN */
+  border-color: var(--accent-neon, #0055ff); 
+  box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.25);
 }
 
 /* 🟢 SCROLL HORIZONTAL KATEGORI MATTE-GLOW */
@@ -72,29 +53,32 @@
   overflow-x: auto;
   margin-bottom: 8px;
   padding-bottom: 4px;
-  scrollbar-width: none;
+  scrollbar-width: none; /* Hilangkan scrollbar bawaan Firefox */
 }
 
 .scrollKategori::-webkit-scrollbar {
-  display: none;
+  display: none; /* Hilangkan scrollbar bawaan Chrome/Safari */
 }
 
 .btnKategoriPill {
-  padding: 6px 14px;
+  padding: 8px 16px;
+  font-size: 0.84rem;
   border-radius: 20px;
-  border: 1px solid var(--border-color, #eef0f3);
-  background-color: var(--bg-header, #f2f2f7);
-  color: var(--text-main, #1c1c1e);
+  border: 1px solid var(--border-light, #eef0f3);
+  background-color: var(--bg-input, #f2f2f7);
+  color: var(--text-secondary, #8e8e93);
   font-weight: 600;
-  font-size: 0.85rem;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btnKategoriActive {
-  border: 1px solid #0a8168 !important;
-  background-color: #0a8168 !important;
+  /* 🎯 PENCERAHAN: Gunakan Biru Electric / Cyan untuk Kategori Aktif */
+  border: 1px solid var(--accent-neon, #0055ff) !important;
+  background-color: var(--accent-neon, #0055ff) !important;
   color: #ffffff !important;
   font-weight: 700;
+  /* Efek glow biru cyberpunk */
+  box-shadow: 0 4px 14px rgba(0, 85, 255, 0.4); 
 }

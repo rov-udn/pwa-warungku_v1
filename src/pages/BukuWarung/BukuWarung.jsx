@@ -4,7 +4,23 @@ import { importAndTransformJSON } from '../../utils/migrationHelpers';
 import styles from './BukuWarung.module.css'; 
 import SearchBaru from '../../component/SearchBarKategori/SearchBaru';
 
-function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBarang, onMigrasiFirestore, onAddLogPerubahanHarga }) {
+// 🎯 1. IMPOR SAKTI GUDANG GLOBAL DATA TOKO
+import { useAppGudang } from '../../context/useAppGudang.jsx'; 
+
+// 🎯 2. BERSIHKAN PROPS DI DALAM KURUNG () KARENA DATA DIASUP LANGSUNG DARI CONTEXT
+function BukuWarung() {
+  // 🎯 3. AMBIL DATA DAN FUNGSI LANGSUNG DARI GUDANG PUSAT
+  const { 
+    daftarBarang, 
+    userWarung,
+    handleTambahBarang: onTambahBarang, 
+    handleHapusBarang: onHapusBarang, 
+    handleEditBarang: onEditBarang, 
+    handleMigrasiDataFirestore: onMigrasiFirestore, 
+    addLogPerubahanHarga: onAddLogPerubahanHarga 
+  } = useAppGudang();
+
+  // 🔒 STATES LOKAL KHUSUS UI HALAMAN BUKU WARUNG (TETAP DI SINI)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('tambah');
   const [idBarangAktif, setIdBarangAktif] = useState(null);
@@ -29,21 +45,18 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
     'item lain'
   ];
 
-  // ── 🎯 1. LOGIKA FILTER RUGI AKURAT (DISINKRONKAN DENGAN HITUNGAN REAL-TIME CARD) ──
+  // ── 🎯 FILTER RUGI AKURAT ──
   const jumlahBarangRugi = useMemo(() => {
     return daftarBarang.filter(barang => {
-      // Abaikan jika data modal dari agen atau harga jual toko belum diisi sama sekali
       if (!barang.jual || (!barang.hargaModalAgen && !barang.hargaAgen)) return false; 
 
       const hargaJualEceran = Number(barang.jual) || 0;
       const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
       const totalIsiPcs = Number(barang.isiKeEceran || barang.jumlahIsi || 40);
       
-      // Hitung modal eceran riil dari pembagian harga grosir agen
       const modalEceranRiil = hargaModalAgen / totalIsiPcs;
       const isEceranRugi = hargaJualEceran < modalEceranRiil;
 
-      // Evaluasi status rugi untuk paket grosir jika opsi grosir aktif
       const isGrosirRugi = barang.bisaGrosir && barang.jualGrosirTotal && barang.modalGrosirTotal 
         ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
         : false;
@@ -52,7 +65,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
     }).length;
   }, [daftarBarang]);
 
-  // ── 🎯 2. MEMOIZE FILTER SEARCH & KATEGORI BESERTA PILTER BONCOS ──
+  // ── 🎯 MEMOIZE FILTER SEARCH & KATEGORI ──
   const barangFiltered = useMemo(() => {
     return daftarBarang.filter((barang) => {
       const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
@@ -100,7 +113,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
     setIsModalOpen(true);
   };
 
-  // ── 🎯 3. FIX MUTLAK LOG HARGA: MEMBANDINGKAN MODAL GROSIR AGEN ──
+  // ── 🎯 FIX MUTLAK LOG HARGA ──
   const handleSimpanTerpisah = (dataBaru) => {
     if (modalMode === 'tambah') {
       onTambahBarang(dataBaru);
@@ -117,8 +130,9 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
             modalBaru 
           });
         }
-      } catch (e) {
-        console.error('Gagal mencatat perubahan harga:', e);
+      } catch (error) {
+        // 🎯 FIX ESLINT: Ubah 'e' jadi 'error' dan cetak ke console agar tidak unused variable
+        console.error('Gagal mencatat perubahan harga:', error);
       }
     }
     setIsModalOpen(false);
@@ -166,7 +180,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
         placeholder="🔎 Ketik nama barang..."
         style={{ '--searchbar-offset': '18px' }}
       >
-        <button type="button" onClick={bukaModalTambah} className={styles.btnTambah}>+ Barang</button>
+        <button type="button" onClick={bukaModalTambah} className={styles.btnTambah}>➕ </button>
         <button type="button" onClick={() => setIsImportModalOpen(true)} className={styles.btnImport}>Import</button>
       </SearchBaru>
 
@@ -259,7 +273,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
             );
           })
         ) : (
-          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, Fi. 🧐</div>
+          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, {userWarung ? userWarung.pemilik : 'Bos'}. 🧐</div>
         )}
       </div>
 
@@ -277,7 +291,7 @@ function BukuWarung({ daftarBarang = [], onTambahBarang, onHapusBarang, onEditBa
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-header, #ffffff)', width: '100%', maxWidth: '440px', borderRadius: '16px', padding: '20px', boxSizing: 'border-box', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: '800' }}>📥 Impor Data Firestore</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8e8e93)', marginBottom: '12px' }}>
-              Paste teks isi file firestore_raw_2026_06_13.json di bawah ini untuk memindahkan data toko, Fi.
+              Paste teks isi file firestore_raw_2026_06_13.json di bawah ini untuk memindahkan data toko, {userWarung ? userWarung.pemilik : 'Bos'}.
             </p>
             <textarea 
               value={importJsonText}
