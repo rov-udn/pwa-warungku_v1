@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase.js'; 
-import { ref, set, onValue, update } from 'firebase/database';
+import { ref, set, onValue } from 'firebase/database';
 
 // 🎯 IMPOR MODUL AUTHENTICATION DARI FIREBASE
 import { auth } from '../firebase.js';
@@ -43,6 +43,10 @@ export function AppProvider({ children }) {
 
   // ── 🌐 STATE KONEKSI OFFLINE/ONLINE REALTIME ──
   const [isOnline, setIsOnline] = useState(getOnlineStatus());
+
+  const [activePage, setActivePage] = useState(() => 
+  typeof window !== 'undefined' && window.innerWidth <= 768 ? 'dashboard' : 'buku-warung'
+);
 
   // Pantau perubahan jaringan internet secara real-time
   useEffect(() => {
@@ -124,10 +128,14 @@ export function AppProvider({ children }) {
     }
   }, []);
 
+  // 🎯 2. UPDATE FUNGSI LOGIN BIAR LANGSUNG PINDAHIN HALAMAN
   const handleLoginEmail = useCallback(async (email, password) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       alert("🔓 Login Sukses! Data warung Anda otomatis disinkronkan.");
+      
+      // Pas diklik OK, langsung eksekusi ganti halaman di tempat!
+      setActivePage('dashboard'); 
     } catch (error) {
       console.error(error);
       alert(`❌ Login Gagal: ${error.message}`);
@@ -384,80 +392,69 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
 
   const handleMigrasiDataFirestore = useCallback(async (dataFirestoreLama) => {
     try {
-      const tebakKategoriDariNama = (namaBarang) => {
-        const namaKecKecil = (namaBarang || '').toLowerCase();
-        if (namaKecKecil.includes('rokok') || namaKecKecil.includes('filter')) return 'Rokok/Korek';
-        if (namaKecKecil.includes('mie') || namaKecKecil.includes('indomie')) return 'Mie/Instan';
-        if (namaKecKecil.includes('kopi') || namaKecKecil.includes('teh')) return 'Minuman/Kopi/Susu';
-        return 'item lain';
-      };
+      if (!userWarung) {
+        alert("❌ Kamu harus login akun warung dulu, Bos!");
+        return;
+      }
 
       const dataHasilKonversi = dataFirestoreLama.map((itemLama) => {
-        const namaKecil = (itemLama.nama || '').toLowerCase();
-        const isRokok = namaKecil.includes('rokok') || namaKecil.includes('filter');
-        const isSembakoCurah = namaKecil.includes('beras') || namaKecil.includes('gula');
-        let minimalGrosirBesarDefault = Number(itemLama.minimalBeliGrosirBesar || (isSembakoCurah ? 25 : 40));
-        
-        let modalEceranAwal = 0;
-        if (itemLama.modalEceran !== undefined) modalEceranAwal = Number(itemLama.modalEceran);
-        else if (itemLama.modal !== undefined) modalEceranAwal = Number(itemLama.modal);
-
-        const totalHargaAgen = Number(itemLama.hargaAgen || (modalEceranAwal * minimalGrosirBesarDefault));
-        let hargaJualMurni = Number(itemLama.hargaEceran || itemLama.jual || 0);
+        // 🎯 LANGSUNG AMBIL DATA MURNI DARI JSON BOS (Tanpa tebak-tebakan rumus)
+        const modalEceranMurni = Number(itemLama.modal) || Number(itemLama.modalEceran) || 0;
+        const hargaModalAgenMurni = Number(itemLama.hargaModalAgen) || Number(itemLama.hargaAgen) || 0;
+        const hargaJualMurni = Number(itemLama.jual) || Number(itemLama.hargaEceran) || 0;
 
         return {
           id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           nama: itemLama.nama || 'Tanpa Nama',
-          modal: modalEceranAwal, 
-          hargaModalAgen: totalHargaAgen,
-          jual: hargaJualMurni,
-          satuanModal: itemLama.satuanBeli || (isRokok ? 'Slop' : 'Dus'),
-          satuanJual: itemLama.satuanJual || (isRokok ? 'Bungkus' : 'Pcs'),
-          isiGrosirBesar: minimalGrosirBesarDefault,
-          varian: itemLama.varian || [],
-          bisaGrosir: true,
-          minimalBeliGrosir: Number(itemLama.minimalBeliGrosir) || 10,
-          satuanGrosirNama: isRokok ? 'Slop' : 'Kotak/Renteng',
-          jualGrosir: Math.round(modalEceranAwal * 1.05),
-          bisaGrosirBesar: !isRokok,
-          minimalBeliGrosirBesar: minimalGrosirBesarDefault,
-          satuanGrosirBesarNama: itemLama.satuanBeli || (isRokok ? 'Slop' : 'Dus'),
-          jualGrosirBesarTotal: totalHargaAgen,
-          jualGrosirBesarPerPcs: modalEceranAwal,
+          modal: modalEceranMurni, // Rp 14.600
+          hargaModalAgen: hargaModalAgenMurni, // Rp 146.000
+          jual: hargaJualMurni, // Rp 16.000
+          satuanModal: itemLama.satuanModal || itemLama.satuanBeli || 'Slop',
+          satuanJual: itemLama.satuanJual || 'Bungkus',
+          isiGrosirBesar: Number(itemLama.isiGrosirBesar) || 40,
+          varian: Array.isArray(itemLama.varian) ? itemLama.varian : [],
+          bisaGrosir: itemLama.bisaGrosir !== undefined ? itemLama.bisaGrosir : true,
+          minimalBeliGrosir: Number(itemLama.minimalBeliGrosir) || 1,
+          satuanGrosirNama: itemLama.satuanGrosirNama || 'Bungkus',
+          jualGrosir: Number(itemLama.jualGrosir) || hargaJualMurni,
+          bisaGrosirBesar: itemLama.bisaGrosirBesar !== undefined ? itemLama.bisaGrosirBesar : false,
+          minimalBeliGrosirBesar: Number(itemLama.minimalBeliGrosirBesar) || 40,
+          satuanGrosirBesarNama: itemLama.satuanGrosirBesarNama || 'Slop',
+          jualGrosirBesarTotal: Number(itemLama.jualGrosirBesarTotal) || hargaModalAgenMurni,
+          jualGrosirBesarPerPcs: Number(itemLama.jualGrosirBesarPerPcs) || 0,
           catatan: itemLama.catatan || '',
-          stok: Number(itemLama.stok || 0),
-          kategori: itemLama.kategori || tebakKategoriDariNama(itemLama.nama)
+          stok: Number(itemLama.stok) || 0,
+          kategori: itemLama.kategori || 'Rokok/Korek'
         };
       });
 
+      // Urutkan berdasarkan Abjad nama barang
       const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
       
-      // 1. Simpan ke state lokal React agar UI langsung update rapi A-Z
+      // 1. Update State aplikasi secara real-time
       setDaftarBarang(dataSudahUrutAZ);
 
-      // 2. 🎯 STRATEGI BARU: Ubah Array menjadi Objek Map berdasarkan ID masing-masing
-      // Agar Firebase Realtime Database menerimanya berjejer secara massal, bukan menimpa folder
+      // 2. Bungkus ke format Firebase Object Map
       const paketUpdateFirebase = {};
       dataSudahUrutAZ.forEach((barang) => {
         paketUpdateFirebase[barang.id] = barang;
       });
 
-      // 3. Import langsung ke path target database akun baru kamu
-      // Pastikan variabel 'uid' atau 'userWarung.uid' sudah tersedia di dalam scope AppContext kamu ya!
-      const targetBarangRef = ref(db, `users/${userWarung?.uid}/daftarBarang`);
+      // 3. 🎯 TEMBAK KE LACI YANG BENAR: menggunakan idWarung dan folder daftar_barang
+      const targetBarangRef = ref(db, `users/${userWarung.idWarung}/daftar_barang`);
       
-      // Tembak secara massal menggunakan update() agar masuk semua sekaligus!
-      await update(targetBarangRef, paketUpdateFirebase);
+      // Kirim data ke Cloud Firebase
+      await set(targetBarangRef, dataSudahUrutAZ);
 
-      // 4. Cadangkan juga ke LocalStorage lokal laptop sebagai backup cadangan
+      // 4. Backup aman di LocalStorage laptop
       localStorage.setItem(STORAGE_KEYS.barang, JSON.stringify(dataSudahUrutAZ));
 
-      alert(`✅ Berhasil! ${dataSudahUrutAZ.length} barang masuk sekaligus secara rapi berurutan A-Z!`);
+      alert(`✅ Sukses, Bos! ${dataSudahUrutAZ.length} data barang berhasil masuk dengan harga modal & jual yang pas 100%!`);
     } catch (error) {
       console.error(error);
-      alert("❌ Gagal konversi data!");
+      alert("❌ Gagal total pas konversi data: " + error.message);
     }
-  }, [ STORAGE_KEYS.barang, userWarung]);
+  }, [STORAGE_KEYS.barang, userWarung]);
 
   // ── 🛡️ SAFE IMPORT: Terima array barang (sudah ditransform) dan simpan dengan aman
   const handleImportDaftarBarang = useCallback((dataArray) => {
@@ -481,7 +478,9 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
       daftarBarang, 
       historyBelanja, 
       logPerubahanHarga, 
-      isDark, 
+      isDark,
+      activePage,
+      setActivePage, 
       toggleTheme,
       handleDaftarWarungBaru, 
       handleLoginEmail,       
