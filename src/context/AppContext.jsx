@@ -34,6 +34,43 @@ const perPieceFromTotal = (total, units) => {
   return Math.ceil(t / u);
 };
 
+// 🛡️ GARDA PENGAMAN: Memastikan 100% variabel barang lengkap sebelum masuk DB / LocalStorage
+const sanitizeBarang = (item) => {
+  const modalEceran = Number(item.modal) || Number(item.modalEceran) || 0;
+  const hargaModalAgen = Number(item.hargaModalAgen) || Number(item.hargaAgen) || 0;
+  const hargaJualEceran = Number(item.jual) || Number(item.hargaEceran) || 0;
+
+  return {
+    id: item.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    nama: item.nama || 'Tanpa Nama',
+    modal: modalEceran,
+    hargaModalAgen: hargaModalAgen,
+    jual: hargaJualEceran,
+    satuanModal: item.satuanModal || item.satuanBeli || 'Slop',
+    satuanJual: item.satuanJual || 'Bungkus',
+    
+    // 🎯 VARIABEL KRUSIAL GROSIR BESAR (PASTIKAN SELALU ADA DAN TERSIMPAN)
+    isiGrosirBesar: Number(item.isiGrosirBesar) > 0 ? Number(item.isiGrosirBesar) : 40,
+    bisaGrosirBesar: item.bisaGrosirBesar !== undefined ? Boolean(item.bisaGrosirBesar) : false,
+    minimalBeliGrosirBesar: Number(item.minimalBeliGrosirBesar) > 0 ? Number(item.minimalBeliGrosirBesar) : 40,
+    satuanGrosirBesarNama: item.satuanGrosirBesarNama || 'Dus',
+    jualGrosirBesarTotal: Number(item.jualGrosirBesarTotal) > 0 ? Number(item.jualGrosirBesarTotal) : hargaModalAgen,
+    jualGrosirBesarPerPcs: Number(item.jualGrosirBesarPerPcs) || 0,
+
+    // 🎯 VARIABEL GROSIR MENENGAH (RENTENG/PACK/SLOP)
+    bisaGrosir: item.bisaGrosir !== undefined ? Boolean(item.bisaGrosir) : true,
+    minimalBeliGrosir: Number(item.minimalBeliGrosir) > 0 ? Number(item.minimalBeliGrosir) : 10,
+    satuanGrosirNama: item.satuanGrosirNama || 'Slop',
+    jualGrosir: Number(item.jualGrosir) || hargaJualEceran,
+
+    // 🎯 METADATA TAMBAHAN
+    varian: Array.isArray(item.varian) ? item.varian : [],
+    catatan: item.catatan || '',
+    stok: Number(item.stok) || 0,
+    kategori: item.kategori || 'Umum'
+  };
+};
+
 export function AppProvider({ children }) {
   // ── 👤 STATE MULTI-USER WARUNG VIA CLOUD AUTH ──
   const [userWarung, setUserWarung] = useState(() => {
@@ -212,12 +249,14 @@ export function AppProvider({ children }) {
 
   // ── ⚙️ FUNGSI MUTASI UTAMA TOKO ──
   const handleTambahBarang = useCallback((barangBaru) => {
-    setDaftarBarang((prevBarang) => {
-      const updateData = [...prevBarang, { ...barangBaru, id: Date.now() }];
-      persistAndSync(STORAGE_KEYS.barang, updateData);
-      return updateData;
-    });
-  }, [persistAndSync, STORAGE_KEYS.barang]);
+  setDaftarBarang((prevBarang) => {
+    // 🎯 Lewatkan ke sanitizeBarang agar variabel isiGrosirBesar & jualGrosirBesar PASTI ADA
+    const barangBersih = sanitizeBarang({ ...barangBaru, id: Date.now() });
+    const updateData = [...prevBarang, barangBersih];
+    persistAndSync(STORAGE_KEYS.barang, updateData);
+    return updateData;
+  });
+}, [persistAndSync, STORAGE_KEYS.barang]);
 
   const handleEditBarang = useCallback((id, dataDiperbarui) => {
     setDaftarBarang((prevBarang) => {
@@ -259,13 +298,14 @@ export function AppProvider({ children }) {
           }
 
           const modalLamaUntukLog = prevModal !== null ? Number(prevModal) : (barang.modal || 0);
-          if (modalLamaUntukLog !== modalEceranTerkecil) {
+          // 🎯 PASTIKAN LOG HANYA MENCATAT HASIL PERHITUNGAN ECERAN TERKECIL
+          if (modalLamaUntukLog > 0 && modalEceranTerkecil > 0 && modalLamaUntukLog !== modalEceranTerkecil) {
             logBaruBaru = {
               idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
               tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
               namaBarang: barang.nama,
-              modalLama: Number(modalLamaUntukLog),
-              modalBaru: Number(modalEceranTerkecil)
+              modalLama: Number(modalLamaUntukLog),   // Eceran Lama
+              modalBaru: Number(modalEceranTerkecil)  // Eceran Baru (Hasil bagi per-piece)
             };
           }
           return { ...barang, modal: modalEceranTerkecil };
@@ -302,30 +342,40 @@ export function AppProvider({ children }) {
     });
   }, [persistAndSync, STORAGE_KEYS.logHarga]);
 
-  // ── ⚙️ FUNGSI UTAMA KOREKSI NOTA KULAKAN (AMANDEMEN ANTI-DOUBLE + LOG MANTAP) ──
-  const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
-    const logAntreanBaru = [];
+  // ── ⚙️ FIX: FUNGSI KOREKSI NOTA BATCH SYNC SAFE ──
+const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
+  let logAntreanBaru = [];
+  let barangTerupdate = [];
+  let historyTerupdate = [];
 
-    // 1. UPDATE STATE DAFTAR BARANG SECARA BATCH LOKAL
+      // 1. Hitung Update Barang
     setDaftarBarang((prevBarang) => {
-      const barangUpdate = prevBarang.map((barang) => {
-        // 🎯 DIUBAH: Dibungkus dengan Number() agar perbandingan ID Text vs Angka tetap COCOK!
-const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(barang.id));
+      barangTerupdate = prevBarang.map((barang) => {
+        const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(barang.id));
         if (itemKoreksi) {
           const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
           const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
-          const isiGrosirMenengah = Number(barang.minimalBeliGrosir) || 10;
-          const modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * isiGrosirMenengah);
-          
+          const isiGrosirMenengah = Number(barang.minimalBeliGrosir) > 0 
+          ? Number(barang.minimalBeliGrosir) 
+          : 1; // Fallback aman ke 1 (satuan eceran) jika tidak terdefinisi
+          let modalGrosirMenengahBaru;
+
+          // Jika item nota membawa data isi grosir langsung dari form koreksi
+          if (itemKoreksi.isiPerPak && Number(itemKoreksi.isiPerPak) > 0) {
+            modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * Number(itemKoreksi.isiPerPak));
+          } else {
+            // Jika tidak, gunakan pengali dari profil data barang yang sudah ada
+            modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * isiGrosirMenengah);
+          }
           const modalEceranLama = Number(barang.modal) || 0;
-          
-          if (modalEceranBaru !== modalEceranLama) {
+
+          if (modalEceranLama > 0 && modalEceranBaru > 0 && modalEceranLama !== modalEceranBaru) {
             logAntreanBaru.push({
               idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
               tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
               namaBarang: barang.nama,
-              modalLama: Number(modalEceranLama),
-              modalBaru: Number(modalEceranBaru)
+              modalLama: modalEceranLama, // Rp 38.500
+              modalBaru: modalEceranBaru  // Rp 39.000 (Misal naik 500 per bungkus)
             });
           }
 
@@ -339,33 +389,33 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
         }
         return barang;
       });
-
-      persistAndSync(STORAGE_KEYS.barang, barangUpdate);
-      return barangUpdate;
+      return barangTerupdate;
     });
 
-    // 2. UPDATE STATE HISTORY BELANJA SECARA BATCH LOKAL
+    // 2. Hitung Update History
     setHistoryBelanja((prevHistory) => {
-      const historyUpdate = prevHistory.map((nota) => {
-        // Bandingkan sebagai string untuk menghindari mismatch tipe
-        if ((String(nota.id) || '') === (String(idNota) || '')) {
+      historyTerupdate = prevHistory.map((nota) => {
+        if (String(nota.id) === String(idNota)) {
           return { ...nota, items: itemsDiperbarui, totalPengeluarannya: totalPengeluaranBaru };
         }
         return nota;
       });
-
-      persistAndSync(STORAGE_KEYS.history, historyUpdate);
-      return historyUpdate;
+      return historyTerupdate;
     });
 
-    // 3. UPDATE STATE LOG HARGA SECARA BATCH LOKAL
-    if (logAntreanBaru.length > 0) {
-      setLogPerubahanHarga((prevLog) => {
-        const updateLog = [...logAntreanBaru, ...prevLog];
-        persistAndSync(STORAGE_KEYS.logHarga, updateLog);
-        return updateLog;
-      });
-    }
+    // 3. Simpan Synchronous ke Local & Firebase sekaligus agar TIDAK BALAPAN
+    setTimeout(() => {
+      persistAndSync(STORAGE_KEYS.barang, barangTerupdate);
+      persistAndSync(STORAGE_KEYS.history, historyTerupdate);
+
+      if (logAntreanBaru.length > 0) {
+        setLogPerubahanHarga((prevLog) => {
+          const updateLog = [...logAntreanBaru, ...prevLog];
+          persistAndSync(STORAGE_KEYS.logHarga, updateLog);
+          return updateLog;
+        });
+      }
+    }, 50);
 
   }, [persistAndSync, STORAGE_KEYS.barang, STORAGE_KEYS.history, STORAGE_KEYS.logHarga]);
 
@@ -458,18 +508,21 @@ const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(ba
 
   // ── 🛡️ SAFE IMPORT: Terima array barang (sudah ditransform) dan simpan dengan aman
   const handleImportDaftarBarang = useCallback((dataArray) => {
-    try {
-      if (!Array.isArray(dataArray)) return { success: false, message: 'Input harus berupa array' };
-      const dataSudahUrut = dataArray.slice().sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
-      setDaftarBarang(dataSudahUrut);
-      // Gunakan persistAndSync agar naming key dan firebase path konsisten dengan app
-      persistAndSync(STORAGE_KEYS.barang, dataSudahUrut);
-      return { success: true, count: dataSudahUrut.length };
-    } catch (err) {
-      console.error('Import gagal', err);
-      return { success: false, error: err.message };
-    }
-  }, [persistAndSync, STORAGE_KEYS.barang]);
+  try {
+    if (!Array.isArray(dataArray)) return { success: false, message: 'Input harus berupa array' };
+    
+    // 🎯 Bersihkan setiap item impor dengan skema lengkap
+    const dataCleaned = dataArray.map(item => sanitizeBarang(item));
+    const dataSudahUrut = dataCleaned.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+    
+    setDaftarBarang(dataSudahUrut);
+    persistAndSync(STORAGE_KEYS.barang, dataSudahUrut);
+    return { success: true, count: dataSudahUrut.length };
+  } catch (err) {
+    console.error('Import gagal', err);
+    return { success: false, error: err.message };
+  }
+}, [persistAndSync, STORAGE_KEYS.barang]);
 
   return (
     <AppContext.Provider value={{

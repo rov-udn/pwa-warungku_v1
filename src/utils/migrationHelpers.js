@@ -1,28 +1,28 @@
+import * as XLSX from 'xlsx';
+
 /**
- * Migration utilities untuk Firestore → App
+ * Migration utilities untuk Firestore / Excel / CSV → App
  */
 
-// ── 🍏 FUNGSI TEBAKAN HARGA LAMA SUDAH DIHAPUS AGAR LOLOS ESLINT ──
-
+// ── 🍏 FUNGSI TRANSFOMASI DATA UTAMA (TETAP SAMA SEPERTI MILIKMU) ──
 export function transformFirestoreDoc(doc, docId, idx) {
-  // 🎯 AMAN ESLINT: Langsung ambil data non-harga yang dibutuhkan saja
-  const nama = doc.nama || `Item ${idx + 1}`;
-  const kategoriLower = (doc.kategori || '').toLowerCase();
-  const catatan = [doc.catatanUtama || '', doc.catatanHarga || ''].filter(Boolean).join(' | ');
+  const nama = doc.nama || doc['Nama Barang'] || doc.Nama || `Item ${idx + 1}`;
+  const kategoriRaw = doc.kategori || doc.Kategori || doc['Kategori'] || '';
+  const kategoriLower = String(kategoriRaw).toLowerCase();
+  const catatan = [doc.catatanUtama || '', doc.catatanHarga || '', doc.Catatan || ''].filter(Boolean).join(' | ');
 
-  // Mengatur logika grosir dasar bawaan
   const bisaGrosir = kategoriLower.includes('rokok') || kategoriLower.includes('snack') || kategoriLower.includes('mie') || kategoriLower.includes('biskit');
   const bisaGrosirBesar = !kategoriLower.includes('rokok');
-  const satuanBeliLower = (doc.satuanBeli || '').toLowerCase();
+  const satuanBeliLower = String(doc.satuanBeli || doc['Satuan Beli'] || doc.satuanModal || '').toLowerCase();
   const satuanGrosirBesarNama = satuanBeliLower.includes('slop') ? 'Bal' : (satuanBeliLower.includes('pack') ? 'Dus' : 'Dus');
 
-  // ── 🎯 NORMALISASI KATEGORI ──
-  let kategoriFinal = doc.kategori || 'item lain';
+  // Normalisasi Kategori
+  let kategoriFinal = kategoriRaw || 'item lain';
   if (kategoriLower.includes('medical') || kategoriLower.includes('obat')) {
     kategoriFinal = 'Obat-obatan/Medical item';
   } else if (kategoriLower.includes('minuman') || kategoriLower.includes('kopi')) {
     kategoriFinal = 'Minuman/Kopi/Susu';
-  } else if (kategoriLower.includes('snack') || kategoriLower.includes('roti')) {
+  } else if (kategoriLower.includes('snack') || kategoriLower.includes('roti') || kategoriLower.includes('biskit')) {
     kategoriFinal = 'Snack/Biskuit/Roti';
   } else if (kategoriLower.includes('sabun') || kategoriLower.includes('bersih')) {
     kategoriFinal = 'Sabun/Pembersih';
@@ -36,13 +36,12 @@ export function transformFirestoreDoc(doc, docId, idx) {
     kategoriFinal = 'Rokok/Korek';
   }
 
-  // Ambil nilai numerik dengan fallback yang aman
   const safeNumber = (v, fallback = 0) => {
+    if (v === '' || v === null || v === undefined) return fallback;
     const n = Number(v);
     return Number.isNaN(n) ? fallback : n;
   };
 
-  // Normalisasi satuan
   const normalizeSatuan = (s) => {
     if (!s) return 'Pcs';
     const t = String(s).trim();
@@ -50,40 +49,37 @@ export function transformFirestoreDoc(doc, docId, idx) {
   };
 
   return {
-    id: docId || (doc.id || `${Date.now()}-${idx}`),
+    id: String(docId || doc.id || `${Date.now()}-${idx}`),
     nama: nama,
 
-    // Salin harga jika tersedia, jika tidak tetap kosong string untuk menandakan belum di-set
-    modal: doc.modal !== undefined ? doc.modal : (doc.modalEceran ?? ''),
-    hargaModalAgen: doc.hargaModalAgen !== undefined ? doc.hargaModalAgen : (doc.hargaAgen ?? ''),
-    jual: doc.jual !== undefined ? doc.jual : (doc.jual ?? ''),
+    // Mentoleransi nama kolom Excel maupun properti JSON Firestore
+    modal: doc.modal !== undefined ? doc.modal : (doc['Harga Modal'] ?? doc.modalEceran ?? ''),
+    hargaModalAgen: doc.hargaModalAgen !== undefined ? doc.hargaModalAgen : (doc['Harga Agen'] ?? doc.hargaAgen ?? ''),
+    jual: doc.jual !== undefined ? doc.jual : (doc['Harga Jual'] ?? doc.jualEceran ?? ''),
     hargaEceran: doc.hargaEceran !== undefined ? doc.hargaEceran : (doc.hargaEceran ?? ''),
 
-    // Satuan & varian
-    satuanModal: normalizeSatuan(doc.satuanModal || doc.satuanBeli),
-    satuanJual: normalizeSatuan(doc.satuanJual || doc.satuanBeli),
+    satuanModal: normalizeSatuan(doc.satuanModal || doc.satuanBeli || doc['Satuan Beli']),
+    satuanJual: normalizeSatuan(doc.satuanJual || doc.satuanBeli || doc['Satuan Jual']),
     varian: Array.isArray(doc.varian) ? doc.varian : (doc.varian ? [doc.varian] : []),
 
-    // Preserve grosir-related fields from source JSON when present
     bisaGrosir: doc.bisaGrosir !== undefined ? Boolean(doc.bisaGrosir) : bisaGrosir,
-    minimalBeliGrosir: safeNumber(doc.minimalBeliGrosir, bisaGrosir ? 10 : null),
-    jualGrosir: doc.jualGrosir !== undefined ? doc.jualGrosir : (doc.jualGrosir ?? null),
+    minimalBeliGrosir: safeNumber(doc.minimalBeliGrosir || doc['Isi Per Slop'], bisaGrosir ? 10 : null),
+    jualGrosir: doc.jualGrosir !== undefined ? doc.jualGrosir : null,
     satuanGrosirNama: doc.satuanGrosirNama || (bisaGrosir ? 'Renteng' : ''),
 
     bisaGrosirBesar: doc.bisaGrosirBesar !== undefined ? Boolean(doc.bisaGrosirBesar) : bisaGrosirBesar,
-    minimalBeliGrosirBesar: safeNumber(doc.minimalBeliGrosirBesar, bisaGrosirBesar ? 40 : null),
+    minimalBeliGrosirBesar: safeNumber(doc.minimalBeliGrosirBesar || doc['Isi Per Dus'], bisaGrosirBesar ? 40 : null),
     jualGrosirBesarTotal: doc.jualGrosirBesarTotal !== undefined ? doc.jualGrosirBesarTotal : null,
     jualGrosirBesarPerPcs: doc.jualGrosirBesarPerPcs !== undefined ? doc.jualGrosirBesarPerPcs : null,
     satuanGrosirBesarNama: doc.satuanGrosirBesarNama || (bisaGrosirBesar ? satuanGrosirBesarNama : ''),
 
     catatan: catatan || doc.catatan || '',
-    stok: safeNumber(doc.stok, 0),
+    stok: safeNumber(doc.stok || doc.Stok || doc.STOK, 0),
     kategori: kategoriFinal,
 
-    // Additional helpers preserved from source if present
     isiKeEceran: safeNumber(doc.isiKeEceran, doc.isiPerSatuan || doc.isiSatuan || 1),
     isiPerSatuan: safeNumber(doc.isiPerSatuan, doc.isiSatuan || doc.isiKeEceran || 1),
-    modalEceran: doc.modalEceran !== undefined ? doc.modalEceran : (doc.modalEceran ?? ''),
+    modalEceran: doc.modalEceran !== undefined ? doc.modalEceran : '',
     modalGrosirTotal: doc.modalGrosirTotal !== undefined ? doc.modalGrosirTotal : null
   };
 }
@@ -92,16 +88,34 @@ export function transformFirestoreArray(docs) {
   return docs.map((doc, idx) => transformFirestoreDoc(doc, doc.id, idx));
 }
 
-/**
- * Import handler: parse JSON string → transform → return array
- */
-export function importAndTransformJSON(jsonString) {
+// ── 🚀 FUNGSI BARU: PARSER UNIVERSAL (Bisa File Excel, CSV, Maupun JSON) ──
+export async function importAndTransformAnyFile(file) {
   try {
-    const data = JSON.parse(jsonString);
-    const docs = Array.isArray(data) ? data : [data];
-    const transformed = transformFirestoreArray(docs);
+    const fileName = file.name.toLowerCase();
+    let rawDocs = [];
+
+    if (fileName.endsWith('.json')) {
+      // BACA JSON
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      rawDocs = Array.isArray(parsed) ? parsed : [parsed];
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+      // BACA EXCEL / CSV
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      rawDocs = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+    } else {
+      return { success: false, error: 'Format file tidak didukung! Harus .json, .xlsx, .xls, atau .csv' };
+    }
+
+    // Lewatkan semua baris data ke fungsi transformasi milikmu
+    const transformed = transformFirestoreArray(rawDocs);
     return { success: true, data: transformed, count: transformed.length };
+
   } catch (err) {
+    console.error("Gagal impor file:", err);
     return { success: false, error: err.message };
   }
 }
