@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+//import * as XLSX from 'xlsx';
 
 /**
  * Migration utilities untuk Firestore / Excel / CSV → App
@@ -88,26 +88,37 @@ export function transformFirestoreArray(docs) {
   return docs.map((doc, idx) => transformFirestoreDoc(doc, doc.id, idx));
 }
 
-// ── 🚀 FUNGSI BARU: PARSER UNIVERSAL (Bisa File Excel, CSV, Maupun JSON) ──
-export async function importAndTransformAnyFile(file) {
+// ── 🚀 FUNGSI PARSER UNIVERSAL (BISA TERIMA FILE ATAU STRING) ──
+export async function importAndTransformJSON(input) {
   try {
-    const fileName = file.name.toLowerCase();
     let rawDocs = [];
 
-    if (fileName.endsWith('.json')) {
-      // BACA JSON
-      const text = await file.text();
-      const parsed = JSON.parse(text);
+    // 1. JIKA INPUT ADALAH STRING JSON POLOS (Panggilan Legacy / Kode Lama)
+    if (typeof input === 'string') {
+      const parsed = JSON.parse(input);
       rawDocs = Array.isArray(parsed) ? parsed : [parsed];
-    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
-      // BACA EXCEL / CSV
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      rawDocs = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+    } 
+    // 2. JIKA INPUT ADALAH OBJEK FILE (Excel, CSV, atau JSON)
+    else if (input && typeof input === 'object' && input.name) {
+      const fileName = input.name.toLowerCase();
+
+      if (fileName.endsWith('.json')) {
+        const text = await input.text();
+        const parsed = JSON.parse(text);
+        rawDocs = Array.isArray(parsed) ? parsed : [parsed];
+      } // ✅ BACA EXCEL / CSV PAKAI DYNAMIC IMPORT (Bikin aplikasi tetep ringan & cepat)
+      else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+        const XLSX = await import('xlsx'); // 👈 Hanya di-load pas user ngirim file Excel!
+        const arrayBuffer = await input.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        rawDocs = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      } else {
+        return { success: false, error: 'Format file tidak didukung! Harus .json, .xlsx, .xls, atau .csv' };
+      }
     } else {
-      return { success: false, error: 'Format file tidak didukung! Harus .json, .xlsx, .xls, atau .csv' };
+      return { success: false, error: 'Data input tidak valid!' };
     }
 
     // Lewatkan semua baris data ke fungsi transformasi milikmu
