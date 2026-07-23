@@ -343,49 +343,57 @@ export function AppProvider({ children }) {
   }, [persistAndSync, STORAGE_KEYS.logHarga]);
 
   // ── ⚙️ FIX: FUNGSI KOREKSI NOTA BATCH SYNC SAFE ──
-const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
-  let logAntreanBaru = [];
-  let barangTerupdate = [];
-  let historyTerupdate = [];
+  const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
+    let logAntreanBaru = [];
+    let barangTerupdate = [];
+    let historyTerupdate = [];
 
-      // 1. Hitung Update Barang
+    // 1. Hitung Update Barang
     setDaftarBarang((prevBarang) => {
       barangTerupdate = prevBarang.map((barang) => {
-        const itemKoreksi = itemsDiperbarui.find((item) => Number(item.id) === Number(barang.id));
-        if (itemKoreksi) {
-          const modalEceranBaru = Number(itemKoreksi.modalEceranTerhitung) || 0;
-          const hargaNotaAgenBaru = Number(itemKoreksi.modalBaru) || 0;
-          const isiGrosirMenengah = Number(barang.minimalBeliGrosir) > 0 
-          ? Number(barang.minimalBeliGrosir) 
-          : 1; // Fallback aman ke 1 (satuan eceran) jika tidak terdefinisi
-          let modalGrosirMenengahBaru;
+        // 🎯 FIX 1: Cocokkan ID sebagai String (atau nama barang jika ID beda format)
+        const itemKoreksi = itemsDiperbarui.find((item) => 
+          String(item.id) === String(barang.id) || 
+          (item.nama && barang.nama && item.nama.toLowerCase().trim() === barang.nama.toLowerCase().trim())
+        );
 
-          // Jika item nota membawa data isi grosir langsung dari form koreksi
-          if (itemKoreksi.isiPerPak && Number(itemKoreksi.isiPerPak) > 0) {
-            modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * Number(itemKoreksi.isiPerPak));
-          } else {
-            // Jika tidak, gunakan pengali dari profil data barang yang sudah ada
-            modalGrosirMenengahBaru = Math.ceil(modalEceranBaru * isiGrosirMenengah);
-          }
+        if (itemKoreksi) {
+          // 1. Ambil modal eceran yang SUDAH BERHASIL DIHITUNG oleh ModalBarang.jsx
+          const modalEceranBaru = Number(
+            itemKoreksi.modalEceranTerhitung ?? 
+            itemKoreksi.modalEceran ?? 
+            itemKoreksi.modal ?? 
+            0
+          );
+
+          // 2. Ambil harga total nota agen
+          const hargaNotaAgenBaru = Number(
+            itemKoreksi.hargaModalAgen ?? 
+            itemKoreksi.modalBaru ?? 
+            barang.hargaModalAgen ?? 
+            0
+          );
+
           const modalEceranLama = Number(barang.modal) || 0;
 
+          // 3. 🎯 LOG HANYA MEMBANDINGKAN ECERAN LAMA (Rp 24.900) VS ECERAN BARU (Rp 24.900)
           if (modalEceranLama > 0 && modalEceranBaru > 0 && modalEceranLama !== modalEceranBaru) {
             logAntreanBaru.push({
               idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
               tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
               namaBarang: barang.nama,
-              modalLama: modalEceranLama, // Rp 38.500
-              modalBaru: modalEceranBaru  // Rp 39.000 (Misal naik 500 per bungkus)
+              modalLama: modalEceranLama,
+              modalBaru: modalEceranBaru
             });
           }
 
-          return {
+          return sanitizeBarang({
             ...barang,
             modal: modalEceranBaru,
             hargaModalAgen: hargaNotaAgenBaru,
-            modalGrosirTotal: modalGrosirMenengahBaru,
+            modalGrosirTotal: itemKoreksi.modalGrosirTotal || barang.modalGrosirTotal,
             jualGrosirBesarTotal: hargaNotaAgenBaru
-          };
+          });
         }
         return barang;
       });
@@ -403,10 +411,14 @@ const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaran
       return historyTerupdate;
     });
 
-    // 3. Simpan Synchronous ke Local & Firebase sekaligus agar TIDAK BALAPAN
+    // 3. Simpan Synchronous ke LocalStorage & Firebase
     setTimeout(() => {
-      persistAndSync(STORAGE_KEYS.barang, barangTerupdate);
-      persistAndSync(STORAGE_KEYS.history, historyTerupdate);
+      if (barangTerupdate.length > 0) {
+        persistAndSync(STORAGE_KEYS.barang, barangTerupdate);
+      }
+      if (historyTerupdate.length > 0) {
+        persistAndSync(STORAGE_KEYS.history, historyTerupdate);
+      }
 
       if (logAntreanBaru.length > 0) {
         setLogPerubahanHarga((prevLog) => {

@@ -85,7 +85,9 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       nama,
       kategori,
       modal: modalEceranTerkecil, 
-      modalEceran: modalEceranTerkecil, 
+      modalEceran: modalEceranTerkecil,
+      modalEceranTerhitung: modalEceranTerkecil, // 🎯 TAMBAHKAN KEY INI (Hitungan Eceran Siap Pakai!)
+      modalBaru: hargaNota, 
       jual: jualEceran ? Number(jualEceran) : '', 
       hargaEceran: jualEceran ? Number(jualEceran) : '', 
       satuanModal: satuanTerbesar,
