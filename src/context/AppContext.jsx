@@ -39,6 +39,14 @@ const sanitizeBarang = (item) => {
   const modalEceran = Number(item.modal) || Number(item.modalEceran) || 0;
   const hargaModalAgen = Number(item.hargaModalAgen) || Number(item.hargaAgen) || 0;
   const hargaJualEceran = Number(item.jual) || Number(item.hargaEceran) || 0;
+  
+  const isiGrosirBesar = Number(item.isiGrosirBesar) > 0 ? Number(item.isiGrosirBesar) : 40;
+  const jualGrosirBesarTotal = Number(item.jualGrosirBesarTotal) > 0 ? Number(item.jualGrosirBesarTotal) : hargaModalAgen;
+
+  // 🎯 FIX: Hitung otomatis harga per Pcs jika jualGrosirBesarPerPcs bernilai 0 / falsy
+  const hitungJualGrosirBesarPerPcs = Number(item.jualGrosirBesarPerPcs) > 0 
+    ? Number(item.jualGrosirBesarPerPcs) 
+    : Math.ceil(jualGrosirBesarTotal / isiGrosirBesar);
 
   return {
     id: item.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -49,13 +57,13 @@ const sanitizeBarang = (item) => {
     satuanModal: item.satuanModal || item.satuanBeli || 'Slop',
     satuanJual: item.satuanJual || 'Bungkus',
     
-    // 🎯 VARIABEL KRUSIAL GROSIR BESAR (PASTIKAN SELALU ADA DAN TERSIMPAN)
-    isiGrosirBesar: Number(item.isiGrosirBesar) > 0 ? Number(item.isiGrosirBesar) : 40,
+    // 🎯 VARIABEL GROSIR BESAR (SUDAH AMAN DARI NILAI 0)
+    isiGrosirBesar: isiGrosirBesar,
     bisaGrosirBesar: item.bisaGrosirBesar !== undefined ? Boolean(item.bisaGrosirBesar) : false,
-    minimalBeliGrosirBesar: Number(item.minimalBeliGrosirBesar) > 0 ? Number(item.minimalBeliGrosirBesar) : 40,
+    minimalBeliGrosirBesar: Number(item.minimalBeliGrosirBesar) > 0 ? Number(item.minimalBeliGrosirBesar) : isiGrosirBesar,
     satuanGrosirBesarNama: item.satuanGrosirBesarNama || 'Dus',
-    jualGrosirBesarTotal: Number(item.jualGrosirBesarTotal) > 0 ? Number(item.jualGrosirBesarTotal) : hargaModalAgen,
-    jualGrosirBesarPerPcs: Number(item.jualGrosirBesarPerPcs) || 0,
+    jualGrosirBesarTotal: jualGrosirBesarTotal,
+    jualGrosirBesarPerPcs: hitungJualGrosirBesarPerPcs,
 
     // 🎯 VARIABEL GROSIR MENENGAH (RENTENG/PACK/SLOP)
     bisaGrosir: item.bisaGrosir !== undefined ? Boolean(item.bisaGrosir) : true,
