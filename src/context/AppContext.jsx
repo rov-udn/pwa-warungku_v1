@@ -550,8 +550,8 @@ export function AppProvider({ children }) {
   }
 }, [persistAndSync, STORAGE_KEYS.barang]);
 
-// 🧹 FUNGSI PEMBERSIH DATA MASAL (SATU KLIK UNTUK SEMUA BARANG)
-const handleBersihkanDataDatabase = useCallback(async () => {
+// 🧹 FUNGSI PEMBERSIH DATA DENGAN SAFETY STATE
+const handleBersihkanDataDatabase = useCallback(() => {
   if (!userWarung) {
     alert("❌ Kamu harus login dulu, Bos!");
     return;
@@ -566,19 +566,21 @@ const handleBersihkanDataDatabase = useCallback(async () => {
   if (!konfirmasi) return;
 
   try {
-    // 1. Ambil data saat ini & rapikan pakai sanitizeBarang terbaru
-    const dataBersih = daftarBarang.map((barang) => sanitizeBarang(barang));
-
-    // 2. Simpan ke LocalStorage dan Firebase secara serentak
-    setDaftarBarang(dataBersih);
-    persistAndSync(STORAGE_KEYS.barang, dataBersih);
-
-    alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} data barang berhasil dibersihkan dan dirapikan di Firebase!`);
+    // 🎯 GUNAKAN PREV STATE AGAR SELALU AMAN & AMBIL DATA TERBARU
+    setDaftarBarang((prevBarang) => {
+      const dataBersih = prevBarang.map((barang) => sanitizeBarang(barang));
+      
+      // Sync ke LocalStorage & Firebase
+      persistAndSync(STORAGE_KEYS.barang, dataBersih);
+      
+      alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} data barang berhasil dibersihkan dan dirapikan di Firebase!`);
+      return dataBersih;
+    });
   } catch (error) {
     console.error("Gagal membersihkan data:", error);
     alert("❌ Gagal merapikan database: " + error.message);
   }
-}, [daftarBarang, userWarung, persistAndSync, STORAGE_KEYS.barang]);
+}, [userWarung, persistAndSync, STORAGE_KEYS.barang]);
 
   return (
     <AppContext.Provider value={{
