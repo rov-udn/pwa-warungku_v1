@@ -16,7 +16,8 @@ function BukuWarung() {
     handleHapusBarang: onHapusBarang, 
     handleEditBarang: onEditBarang, 
     handleMigrasiDataFirestore: onMigrasiFirestore, 
-    addLogPerubahanHarga: onAddLogPerubahanHarga 
+    addLogPerubahanHarga: onAddLogPerubahanHarga,
+    handleBersihkanDataDatabase
   } = useAppGudang();
 
   // 🔒 STATES LOKAL
@@ -208,6 +209,7 @@ function BukuWarung() {
       >
         <button type="button" onClick={bukaModalTambah} className={styles.btnTambah}>➕ </button>
         <button type="button" onClick={() => setIsImportModalOpen(true)} className={styles.btnImport}>Import</button>
+        <button type="button" onClick={handleBersihkanDataDatabase} className={styles.btnCleanUp}>🧹</button>
       </SearchBaru>
 
       <div className={styles.listContainer}>

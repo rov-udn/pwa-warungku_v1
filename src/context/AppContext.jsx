@@ -85,6 +85,36 @@ const sanitizeBarang = (item) => {
   };
 };
 
+// 🧹 FUNGSI PEMBERSIH DATA MASAL (SATU KLIK UNTUK SEMUA BARANG)
+const handleBersihkanDataDatabase = useCallback(async () => {
+  if (!userWarung) {
+    alert("❌ Kamu harus login dulu, Bos!");
+    return;
+  }
+
+  const konfirmasi = window.confirm(
+    "⚠️ PERINGATAN PEMBERSIHAN DATABASE:\n\n" +
+    "Fungsi ini akan merapikan seluruh nama field barang (hapus isiKeEceran, isiPerSatuan, dll, serta membetulkan harga per pcs) TANPA menghapus stok atau nama barang.\n\n" +
+    "Lanjutkan pembersihan?"
+  );
+
+  if (!konfirmasi) return;
+
+  try {
+    // 1. Ambil data saat ini & rapikan pakai sanitizeBarang terbaru
+    const dataBersih = daftarBarang.map((barang) => sanitizeBarang(barang));
+
+    // 2. Simpan ke LocalStorage dan Firebase secara serentak
+    setDaftarBarang(dataBersih);
+    persistAndSync(STORAGE_KEYS.barang, dataBersih);
+
+    alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} data barang berhasil dibersihkan dan dirapikan di Firebase!`);
+  } catch (error) {
+    console.error("Gagal membersihkan data:", error);
+    alert("❌ Gagal merapikan database: " + error.message);
+  }
+}, [daftarBarang, userWarung, persistAndSync, STORAGE_KEYS.barang]);
+
 export function AppProvider({ children }) {
   // ── 👤 STATE MULTI-USER WARUNG VIA CLOUD AUTH ──
   const [userWarung, setUserWarung] = useState(() => {
@@ -572,6 +602,7 @@ export function AppProvider({ children }) {
       handleKoreksiNota,
       handleTambahHistoryBelanja, 
       handleMigrasiDataFirestore,
+      handleBersihkanDataDatabase,
       handleImportDaftarBarang
     }}>
       {children}
