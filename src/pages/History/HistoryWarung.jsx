@@ -4,15 +4,14 @@ import styles from './HistoryWarung.module.css';
 // 🎯 1. IMPOR CUSTOM HOOK GUDANG GLOBAL DATA TOKO
 import { useAppGudang } from '../../context/useAppGudang.jsx';
 
-// 🎯 2. BERSIHKAN PROPS BAWAAN DI DALAM KURUNG () 
 function HistoryWarung() {
-  // 🎯 3. TARIK SELURUH DATA & FUNGSI DARI GUDANG PUSAT CONTEXT
+  // 🎯 2. TARIK DATA & FUNGSI DARI CONTEXT (Tambahkan fallback [] agar anti-crash)
   const { 
-    historyBelanja, 
-    logPerubahanHarga,
+    historyBelanja = [], 
+    logPerubahanHarga = [],
     userWarung, 
     handleKoreksiNota: onKoreksiNota, 
-    daftarBarang 
+    daftarBarang = []
   } = useAppGudang();
 
   const [tabAktif, setTabAktif] = useState('rekap'); // 'rekap' atau 'log'
@@ -46,28 +45,27 @@ function HistoryWarung() {
     setItemsKoreksi([]);
   };
 
-  // ── 🎯 PEMICU MASUK HALAMAN KOREKSI (DIPERKETAT) ──
+  // ── 🎯 PEMICU MASUK HALAMAN KOREKSI (SINKRON KEY ISI GUDANG) ──
   const handleBukaKoreksiHalaman = (nota) => {
-    // Simpan seluruh objek nota agar referensi aman dan mudah diakses
     setNotaSedangDiedit(nota);
     setSelectedNota(null);
-       
+        
     const itemsPecahReferensi = nota.items.map((item, idx) => {
-      // Pastikan perbandingan ID barang menggunakan Number agar aman
-      const barangAsli = daftarBarang.find(b => Number(b.id) === Number(item.id));
+      // Pastikan perbandingan ID barang menggunakan String/Number fleksibel
+      const barangAsli = daftarBarang.find(b => String(b.id) === String(item.id));
       let isiPembagi = 1;
       const satuanNotaKecil = (item.satuanModal || '').toLowerCase();
       
-      if (satuanNotaKecil !== 'pcs' && satuanNotaKecil !== 'bungkus' && satuanNotaKecil !== 'renteng' && barangAsli) {
-        isiPembagi = Number(barangAsli.isiKeEceran) || Number(barangAsli.jumlahIsi) || 1;
+      if (!['pcs', 'bungkus', 'bks', 'eceran'].includes(satuanNotaKecil) && barangAsli) {
+        // 🎯 FIX: Sertakan seluruh alternatif key isi barang dari ModalBarang & BukuWarung
+        isiPembagi = Number(barangAsli.isiKeEceran || barangAsli.isiSatuan || barangAsli.isiPerSatuan || barangAsli.jumlahIsi) || 1;
       }
 
-      // buat idUnik yang stabil berdasarkan nota dan indeks agar React tidak reuse node salah
       const stableIdUnik = item.idUnik || `item-${nota.id}-${idx}`;
       return {
         ...item,
         idUnik: stableIdUnik,
-        modalBaru: item.modalBaru ?? item.hargaModalAgen ?? 0,
+        modalBaru: item.modalBaru ?? item.hargaModalAgen ?? item.hargaModal ?? 0,
         isiKeEceran: isiPembagi
       };
     });
@@ -103,7 +101,8 @@ function HistoryWarung() {
       const dataSinkronGudang = dataValid.map(item => {
         const totalIsi = Number(item.isiKeEceran) || 1;
         const hargaNotaAgen = Number(item.modalBaru) || 0;
-        const modalEceranTerkecil = Math.ceil(hargaNotaAgen / totalIsi);
+        // 🎯 FIX: Presisi harga eceran tanpa Math.ceil berlebih
+        const modalEceranTerkecil = totalIsi > 0 ? (hargaNotaAgen / totalIsi) : hargaNotaAgen;
 
         return {
           ...item,
@@ -137,7 +136,8 @@ function HistoryWarung() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
           {itemsKoreksi.map((item) => {
             const currentModal = item.modalBaru === '' ? 0 : Number(item.modalBaru);
-            const modalPcsEstimasi = Math.round(currentModal / (Number(item.isiKeEceran) || 1));
+            const totalIsi = Number(item.isiKeEceran) || 1;
+            const modalPcsEstimasi = totalIsi > 0 ? Math.round(currentModal / totalIsi) : currentModal;
 
             return (
               <div key={item.idUnik} className={styles.itemKoreksiRow} style={{ padding: '14px', backgroundColor: 'var(--bg-toggle, #ffffff)', borderRadius: '12px', border: '1px solid var(--border-light, #eef0f3)' }}>
@@ -147,7 +147,7 @@ function HistoryWarung() {
                     <strong style={{ fontSize: '0.92rem', display: 'block', color: 'var(--text-main)', marginBottom: '2px' }}>{item.nama}</strong>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                       Kulakan: <strong style={{color: 'var(--text-main)'}}>{item.qty} {item.satuanModal || 'Dus'}</strong>
-                      {item.isiKeEceran > 1 && ` (Isi ${item.isiKeEceran} Pcs)`}
+                      {totalIsi > 1 && ` (Isi ${totalIsi} Pcs)`}
                     </span>
                   </div>
                   
@@ -199,7 +199,7 @@ function HistoryWarung() {
             <span style={{ color: 'var(--accent-cyan)', fontSize: '1.25rem', fontWeight: '900', textShadow: '0 0 10px rgba(0,245,255,0.2)' }}>Rp {totalKoreksiBerjalan.toLocaleString('id-ID')}</span>
           </div>
           {/* 🎯 TOMBOL EKSEKUSI GANTI JADI BIRU ELECTRIC PREMIUM */}
-          <button type="button" onClick={handleEksekusiSimpan} style={{ width: '100%', padding: '12px', backgroundColor: 'var(--accent-neon)', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '0.95rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0, 85, 255, 0.4)' }}>
+          <button type="button" onClick={handleEksekusiSimpan} style={{ width: '100%', padding: '12px', backgroundColor: 'var(--accent-neon, #0055ff)', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '0.95rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0, 85, 255, 0.4)' }}>
             💾 Simpan & Update Gudang
           </button>
         </div>
@@ -242,13 +242,13 @@ function HistoryWarung() {
                 </div>
 
                 <div style={{ margin: '8px 0', borderTop: '1px dashed var(--border-light, #eef0f3)', borderBottom: '1px dashed var(--border-light, #eef0f3)', padding: '6px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {nota.items.map((item, idx) => (
+                  {nota.items?.map((item, idx) => (
                     <div key={item.idUnik || idx} className={styles.itemRow} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                       <span style={{ color: 'var(--text-main)' }}>
                         {item.nama} <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>({item.qty} {item.satuanModal})</span>
                       </span>
                       <span style={{ fontWeight: '600' }}>
-                        Rp {(item.qty * (item.modalBaru ?? item.hargaModalAgen ?? 0)).toLocaleString('id-ID')}
+                        Rp {(item.qty * (item.modalBaru ?? item.hargaModalAgen ?? item.hargaModal ?? 0)).toLocaleString('id-ID')}
                       </span>
                     </div>
                   ))}
@@ -257,7 +257,7 @@ function HistoryWarung() {
                 <div className={styles.totalRow} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
                   <span style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>Total Pengeluaran:</span>
                   {/* 🎯 TOTAL PENGELUARAN CYAN NEON */}
-                  <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(nota.totalPengeluarannya || nota.items.reduce((s,i)=>s+(i.qty*(i.modalBaru ?? i.hargaModalAgen ?? 0)),0)).toLocaleString('id-ID')}</span>
+                  <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(nota.totalPengeluarannya || nota.items?.reduce((s,i)=>s+(i.qty*(i.modalBaru ?? i.hargaModalAgen ?? i.hargaModal ?? 0)),0) || 0).toLocaleString('id-ID')}</span>
                 </div>
               </div>
             ))
@@ -285,14 +285,14 @@ function HistoryWarung() {
                   <strong style={{ display: 'block', color: 'var(--text-main)' }}>{item.nama}</strong>
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{item.qty} {item.satuanModal || 'pcs'}</span>
                 </div>
-                <span style={{ fontWeight: '700' }}>Rp {(item.qty * (item.modalBaru ?? item.hargaModalAgen ?? 0)).toLocaleString('id-ID')}</span>
+                <span style={{ fontWeight: '700' }}>Rp {(item.qty * (item.modalBaru ?? item.hargaModalAgen ?? item.hargaModal ?? 0)).toLocaleString('id-ID')}</span>
               </div>
             ))}
           </div>
 
           <div className={styles.totalRow} style={{ justifyContent: 'space-between', paddingTop: '12px' }}>
             <span style={{ color: 'var(--text-main)', fontSize: '0.88rem' }}>Total Pengeluaran:</span>
-            <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(selectedNota.totalPengeluarannya || selectedNota.items.reduce((s,i)=>s+(i.qty*(i.modalBaru ?? i.hargaModalAgen ?? 0)),0)).toLocaleString('id-ID')}</span>
+            <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(selectedNota.totalPengeluarannya || selectedNota.items?.reduce((s,i)=>s+(i.qty*(i.modalBaru ?? i.hargaModalAgen ?? i.hargaModal ?? 0)),0) || 0).toLocaleString('id-ID')}</span>
           </div>
         </div>
       )}
@@ -300,12 +300,16 @@ function HistoryWarung() {
       {tabAktif === 'log' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {logPerubahanHarga.length === 0 ? (
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', fontSize: '0.85rem' }}>Belum ada pergerakan naik-turn harga modal agen.</p>
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', fontSize: '0.85rem' }}>Belum ada pergerakan naik-turun harga modal agen.</p>
           ) : (
-            logPerubahanHarga.map((log) => {
-              const apakahNaik = log.modalBaru > log.modalLama;
+            logPerubahanHarga.map((log, idx) => {
+              const modalLama = Number(log.modalLama) || 0;
+              const modalBaru = Number(log.modalBaru) || 0;
+              const apakahNaik = modalBaru > modalLama;
+              const keyUnik = log.idLog || `log-${log.tanggal || 'item'}-${idx}`;
+              
               return (
-                <div key={log.idLog} className={styles.cardLog}>
+                <div key={keyUnik} className={styles.cardLog}>
                   <div className={styles.logKiri}>
                     <h4 style={{ color: 'var(--text-main)', margin: '0 0 2px 0', fontSize: '0.9rem' }}>{log.namaBarang}</h4>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>⏰ {log.tanggal}</span>
@@ -314,7 +318,7 @@ function HistoryWarung() {
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Perubahan Modal:</div>
                     {/* 🎯 MODAL NAIK MERAH NEON, MODAL TURUN CYAN GLOW */}
                     <span style={{ color: apakahNaik ? '#ff4d4d' : 'var(--accent-cyan)', fontWeight: '800', fontSize: '0.85rem' }}>
-                      Rp {log.modalLama.toLocaleString('id-ID')} ➔ Rp {log.modalBaru.toLocaleString('id-ID')}
+                      Rp {modalLama.toLocaleString('id-ID')} ➔ Rp {modalBaru.toLocaleString('id-ID')}
                     </span>
                     <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 'bold', color: apakahNaik ? '#ff4d4d' : 'var(--accent-cyan)' }}>
                       {apakahNaik ? '🔺 MODAL NAIK' : '📉 MODAL TURUN'}

@@ -4,14 +4,13 @@ import { importAndTransformJSON } from '../../utils/migrationHelpers';
 import styles from './BukuWarung.module.css'; 
 import SearchBaru from '../../component/SearchBarKategori/SearchBaru';
 
-// 🎯 1. IMPOR SAKTI GUDANG GLOBAL DATA TOKO
+// 🎯 1. IMPOR GUDANG GLOBAL DATA TOKO
 import { useAppGudang } from '../../context/useAppGudang.jsx'; 
 
-// 🎯 2. BERSIHKAN PROPS DI DALAM KURUNG () KARENA DATA DIASUP LANGSUNG DARI CONTEXT
 function BukuWarung() {
-  // 🎯 3. AMBIL DATA DAN FUNGSI LANGSUNG DARI GUDANG PUSAT
+  // 🎯 2. TARIK DATA DAN FUNGSI DARI CONTEXT
   const { 
-    daftarBarang, 
+    daftarBarang = [], 
     userWarung,
     handleTambahBarang: onTambahBarang, 
     handleHapusBarang: onHapusBarang, 
@@ -20,7 +19,7 @@ function BukuWarung() {
     addLogPerubahanHarga: onAddLogPerubahanHarga 
   } = useAppGudang();
 
-  // 🔒 STATES LOKAL KHUSUS UI HALAMAN BUKU WARUNG (TETAP DI SINI)
+  // 🔒 STATES LOKAL
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('tambah');
   const [idBarangAktif, setIdBarangAktif] = useState(null);
@@ -45,14 +44,16 @@ function BukuWarung() {
     'item lain'
   ];
 
-  // ── 🎯 FILTER RUGI AKURAT ──
+  // ── 🎯 FILTER RUGI AKURAT (SOLUSI BUG FALLBACK '40') ──
   const jumlahBarangRugi = useMemo(() => {
     return daftarBarang.filter(barang => {
-      if (!barang.jual || (!barang.hargaModalAgen && !barang.hargaAgen)) return false; 
+      const hargaJualEceran = Number(barang.jual || barang.hargaEceran) || 0;
+      const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen || barang.modalBaru) || 0;
+      
+      if (!hargaJualEceran || !hargaModalAgen) return false; 
 
-      const hargaJualEceran = Number(barang.jual) || 0;
-      const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
-      const totalIsiPcs = Number(barang.isiKeEceran || barang.jumlahIsi || 40);
+      // 🎯 Fix: Jangan pernah default ke 40, pakailah fallback '1'
+      const totalIsiPcs = Number(barang.isiKeEceran || barang.isiSatuan || barang.isiPerSatuan || barang.jumlahIsi) || 1;
       
       const modalEceranRiil = hargaModalAgen / totalIsiPcs;
       const isEceranRugi = hargaJualEceran < modalEceranRiil;
@@ -68,22 +69,22 @@ function BukuWarung() {
   // ── 🎯 MEMOIZE FILTER SEARCH & KATEGORI ──
   const barangFiltered = useMemo(() => {
     return daftarBarang.filter((barang) => {
-      const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
+      const cocokSearch = (barang.nama || '').toLowerCase().includes(searchTerm.toLowerCase());
       const katBarang = (barang.kategori || 'item lain').trim();
       const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
       
-      const hargaJualEceran = Number(barang.jual) || 0;
-      const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
-      const totalIsiPcs = Number(barang.isiKeEceran || barang.jumlahIsi || 40);
+      const hargaJualEceran = Number(barang.jual || barang.hargaEceran) || 0;
+      const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen || barang.modalBaru) || 0;
+      const totalIsiPcs = Number(barang.isiKeEceran || barang.isiSatuan || barang.isiPerSatuan || barang.jumlahIsi) || 1;
       
       const modalEceranRiil = hargaModalAgen / totalIsiPcs;
-      const isEceranRugi = barang.jual && hargaModalAgen ? hargaJualEceran < modalEceranRiil : false;
+      const isEceranRugi = (hargaJualEceran > 0 && hargaModalAgen > 0) ? (hargaJualEceran < modalEceranRiil) : false;
       
       const isGrosirRugi = barang.bisaGrosir && barang.jualGrosirTotal && barang.modalGrosirTotal 
         ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
         : false;
         
-      const apakahRugi = (barang.jual && (barang.hargaModalAgen || barang.hargaAgen)) && (isEceranRugi || isGrosirRugi);
+      const apakahRugi = isEceranRugi || isGrosirRugi;
 
       if (filterRugiAktif) {
         return cocokSearch && cocokKategori && apakahRugi;
@@ -113,15 +114,15 @@ function BukuWarung() {
     setIsModalOpen(true);
   };
 
-  // ── 🎯 FIX MUTLAK LOG HARGA ──
+  // ── 🎯 LOG PERUBAHAN HARGA ──
   const handleSimpanTerpisah = (dataBaru) => {
     if (modalMode === 'tambah') {
       onTambahBarang(dataBaru);
     } else {
       onEditBarang(idBarangAktif, dataBaru);
       try {
-        const modalLama = Number(barangAktif?.hargaModalAgen || barangAktif?.hargaAgen) || 0;
-        const modalBaru = Number(dataBaru.hargaModalAgen || dataBaru.hargaAgen) || 0;
+        const modalLama = Number(barangAktif?.hargaModalAgen || barangAktif?.hargaAgen || barangAktif?.modalBaru) || 0;
+        const modalBaru = Number(dataBaru.hargaModalAgen || dataBaru.hargaAgen || dataBaru.modalBaru) || 0;
         
         if (modalBaru !== modalLama && typeof onAddLogPerubahanHarga === 'function') {
           onAddLogPerubahanHarga({ 
@@ -131,33 +132,25 @@ function BukuWarung() {
           });
         }
       } catch (error) {
-        // 🎯 FIX ESLINT: Ubah 'e' jadi 'error' dan cetak ke console agar tidak unused variable
         console.error('Gagal mencatat perubahan harga:', error);
       }
     }
     setIsModalOpen(false);
   };
 
+  // ── 🎯 IMPOR DATA CLEANUP ──
   const handleImportJson = () => {
     if (!importJsonText.trim()) { alert('Masukkan JSON terlebih dahulu'); return; }
     const result = importAndTransformJSON(importJsonText);
     if (!result.success) { alert(`❌ Error: ${result.error}`); return; }
+    
     if (typeof onMigrasiFirestore === 'function') {
-      // Prefer safe import if available
-      if (typeof onMigrasiFirestore === 'function') {
-        onMigrasiFirestore(result.data);
-      }
-      if (typeof onMigrasiFirestore !== 'function' && typeof onMigrasiFirestore !== 'function') {
-        // fallback no-op
-      }
-      // call AppContext safe import if provided via context (handleImportDaftarBarang)
-      if (typeof onMigrasiFirestore !== 'function' && typeof window !== 'undefined') {
-        // nothing
-      }
+      onMigrasiFirestore(result.data);
       setImportJsonText('');
       setIsImportModalOpen(false);
+      alert('✅ Berhasil impor data ke Firestore!');
     } else {
-      alert('❌ Migration handler tidak tersedia');
+      alert('❌ Fungsi migrasi data tidak tersedia di Context');
     }
   };
 
@@ -169,15 +162,38 @@ function BukuWarung() {
       </div>
 
       {jumlahBarangRugi > 0 && (
-        <div onClick={() => setFilterRugiAktif(!filterRugiAktif)} style={{ backgroundColor: filterRugiAktif ? '#ff3b30' : 'rgba(255, 59, 48, 0.08)', border: '1px solid #ff3b30', borderRadius: '12px', padding: '12px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: filterRugiAktif ? '0 4px 14px rgba(255, 59, 48, 0.35)' : 'none', boxSizing: 'border-box', width: '100%' }}>
+        <div 
+          onClick={() => setFilterRugiAktif(!filterRugiAktif)} 
+          style={{ 
+            backgroundColor: filterRugiAktif ? '#ff3b30' : 'rgba(255, 59, 48, 0.08)', 
+            border: '1px solid #ff3b30', 
+            borderRadius: '12px', 
+            padding: '12px 16px', 
+            marginBottom: '14px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            cursor: 'pointer', 
+            transition: 'all 0.2s ease', 
+            boxShadow: filterRugiAktif ? '0 4px 14px rgba(255, 59, 48, 0.35)' : 'none', 
+            boxSizing: 'border-box', 
+            width: '100%' 
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '1.2rem' }}>⚠️</span>
-            <div style={{ textAlgin: 'left' }}>
-              <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '800', color: filterRugiAktif ? '#ffffff' : '#ff3b30' }}>Ada {jumlahBarangRugi} Barang Jual Rugi / Belum Naik Harga!</p>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: filterRugiAktif ? 'rgba(255,255,255,0.85)' : 'var(--text-muted, #8e8e93)' }}>{filterRugiAktif ? '👉 Menampilkan barang boncos saja (Klik untuk membatalkan)' : '👉 Klik di sini untuk jalan pintas perbaiki harga!'}</p>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '800', color: filterRugiAktif ? '#ffffff' : '#ff3b30' }}>
+                Ada {jumlahBarangRugi} Barang Jual Rugi / Belum Naik Harga!
+              </p>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: filterRugiAktif ? 'rgba(255,255,255,0.85)' : 'var(--text-muted, #8e8e93)' }}>
+                {filterRugiAktif ? '👉 Menampilkan barang boncos saja (Klik untuk membatalkan)' : '👉 Klik di sini untuk jalan pintas perbaiki harga!'}
+              </p>
             </div>
           </div>
-          <span style={{ fontSize: '0.72rem', fontWeight: '800', backgroundColor: filterRugiAktif ? '#ffffff' : '#ff3b30', color: filterRugiAktif ? '#ff3b30' : '#ffffff', padding: '4px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>{filterRugiAktif ? 'Lihat Semua' : 'Shortcut Scann'}</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: '800', backgroundColor: filterRugiAktif ? '#ffffff' : '#ff3b30', color: filterRugiAktif ? '#ff3b30' : '#ffffff', padding: '4px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+            {filterRugiAktif ? 'Lihat Semua' : 'Shortcut Scan'}
+          </span>
         </div>
       )}
 
@@ -199,20 +215,27 @@ function BukuWarung() {
           barangFiltered.map((barang) => {
             const isTerbuka = idCardTerbuka === barang.id;
             
-            const nameSatuanTerbesar = barang.satuanTerbesar || 'Dus';
-            const hargaNotaTerbesar = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
-            const totalIsiPaket = Number(barang.isiKeEceran || barang.jumlahIsi || 40);
-            const hargaJualEceran = Number(barang.jual) || 0;
+            const nameSatuanTerbesar = barang.satuanTerbesar || barang.satuanBeli || 'Dus';
+            const hargaNotaTerbesar = Number(barang.hargaModalAgen || barang.hargaAgen || barang.modalBaru) || 0;
+            const totalIsiPaket = Number(barang.isiKeEceran || barang.isiSatuan || barang.isiPerSatuan || barang.jumlahIsi) || 1;
+            const hargaJualEceran = Number(barang.jual || barang.hargaEceran) || 0;
 
-            // ── 🎯 REAL-TIME MATHEMATHICS CORRECTION FOR CARD ITEM ──
-            const modalEceranRiil = hargaNotaTerbesar / totalIsiPaket;
-            
-            const isEceranRugi = barang.jual && hargaNotaTerbesar ? hargaJualEceran < modalEceranRiil : false;
+            // ── 🎯 REAL-TIME MATH CORRECTION ──
+            const modalEceranRiil = hargaNotaTerbesar > 0 ? (hargaNotaTerbesar / totalIsiPaket) : 0;
+            const isEceranRugi = hargaJualEceran > 0 && hargaNotaTerbesar > 0 ? hargaJualEceran < modalEceranRiil : false;
             const isGrosirRugi = barang.bisaGrosir && barang.jualGrosirTotal && barang.modalGrosirTotal ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) : false;
             const apakahRugi = isEceranRugi || isGrosirRugi;
 
             return (
-              <div key={barang.id} onClick={() => setIdCardTerbuka(isTerbuka ? null : barang.id)} className={styles.cardItem} style={{ border: apakahRugi ? '1px solid rgba(255, 59, 48, 0.55)' : '1px solid var(--border-color, #eef0f3)', backgroundColor: apakahRugi ? 'rgba(255, 59, 48, 0.02)' : 'var(--bg-header, #ffffff)' }}>
+              <div 
+                key={barang.id} 
+                onClick={() => setIdCardTerbuka(isTerbuka ? null : barang.id)} 
+                className={styles.cardItem} 
+                style={{ 
+                  border: apakahRugi ? '1px solid rgba(255, 59, 48, 0.55)' : '1px solid var(--border-color, #eef0f3)', 
+                  backgroundColor: apakahRugi ? 'rgba(255, 59, 48, 0.02)' : 'var(--bg-header, #ffffff)' 
+                }}
+              >
                 <div className={styles.cardMainInfo}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                     <span className={styles.badgeKategori}>{barang.kategori || 'item lain'}</span>
@@ -223,12 +246,12 @@ function BukuWarung() {
                   
                   <div className={styles.priceGrid}>
                     <span>M: <strong style={{ color: 'var(--text-main)' }}>{hargaNotaTerbesar > 0 ? `Rp ${hargaNotaTerbesar.toLocaleString('id-ID')}` : 'Belum Set'}</strong>/{nameSatuanTerbesar}</span>
-                    <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>{barang.jual ? `Rp ${hargaJualEceran.toLocaleString('id-ID')}` : 'Belum Set'}</strong>/{barang.satuanJual || 'Pcs'}</span>
+                    <span>Jual: <strong style={{ color: isEceranRugi ? '#ff3b30' : '#0a8168', fontWeight: '800' }}>{hargaJualEceran > 0 ? `Rp ${hargaJualEceran.toLocaleString('id-ID')}` : 'Belum Set'}</strong>/{barang.satuanJual || 'Pcs'}</span>
                   </div>
 
                   <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
                     {(() => {
-                      if (!barang.jual || !hargaNotaTerbesar) {
+                      if (!hargaJualEceran || !hargaNotaTerbesar) {
                         return (
                           <span style={{ color: '#aeaeb2', backgroundColor: '#2c2c2e', padding: '4px 10px', borderRadius: '6px', display: 'inline-block', border: '1px solid #3a3a3c' }}>
                             ⚙️ Klik "Edit Data" Untuk Mengisi Harga
@@ -240,10 +263,14 @@ function BukuWarung() {
                       const untungRupiahPerUnitBesar = totalOmsetPerUnitBesar - hargaNotaTerbesar;
                       const persenMargin = totalOmsetPerUnitBesar > 0 ? ((untungRupiahPerUnitBesar / totalOmsetPerUnitBesar) * 100).toFixed(1) : 0;
 
-                      return untungRupiahPerUnitBesar > 0 ? (
-                        <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {nameSatuanTerbesar})</span>
+                      return untungRupiahPerUnitBesar >= 0 ? (
+                        <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                          📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {nameSatuanTerbesar})
+                        </span>
                       ) : (
-                        <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>🛑 Jual Rugi: Selisih Rp {Math.abs(untungRupiahPerUnitBesar).toLocaleString('id-ID')}</span>
+                        <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                          🛑 Jual Rugi: Selisih Rp {Math.abs(untungRupiahPerUnitBesar).toLocaleString('id-ID')}
+                        </span>
                       );
                     })()}
                   </div>
@@ -264,7 +291,7 @@ function BukuWarung() {
                       const marginGrosir = hitungMarginCuan(barang.modalGrosirTotal, barang.jualGrosirTotal);
                       return (
                         <div className={styles.detailRow}>
-                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir} {barang.satuanJual || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {Number(barang.jualGrosirTotal).toLocaleString('id-ID')}</strong>
+                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir || 1} {barang.satuanJual || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {Number(barang.jualGrosirTotal).toLocaleString('id-ID')}</strong>
                           {Number(marginGrosir) > 0 && <span style={{ color: '#0a8168', marginLeft: '6px', fontWeight: 'bold', fontSize: '0.78rem' }}>(Cuan Grosir: {marginGrosir}%)</span>}
                         </div>
                       );
@@ -301,7 +328,7 @@ function BukuWarung() {
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-header, #ffffff)', width: '100%', maxWidth: '440px', borderRadius: '16px', padding: '20px', boxSizing: 'border-box', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: '800' }}>📥 Impor Data Firestore</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8e8e93)', marginBottom: '12px' }}>
-              Paste teks isi file firestore_raw_2026_06_13.json di bawah ini untuk memindahkan data toko, {userWarung ? userWarung.pemilik : 'Bos'}.
+              Paste teks isi file JSON di bawah ini untuk memindahkan data toko, {userWarung ? userWarung.pemilik : 'Bos'}.
             </p>
             <textarea 
               value={importJsonText}

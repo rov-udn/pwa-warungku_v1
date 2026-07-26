@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import styles from './ModalBarang.module.css'; // 🎯 Import module CSS baru
+import styles from './ModalBarang.module.css';
 
-// 🎯 1. IMPOR CUSTOM HOOK GUDANG PUSAT
 import { useAppGudang } from '../../../context/useAppGudang.jsx'; 
 
-// 🎯 2. HAPUS 'userWarung' DARI PROPS KARENA KITA TARIK LANGSUNG DARI PUSAT
 function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
-  // 🎯 3. TARIK DATA USER AKTIF DARI GUDANG PUSAT REALTIME
   const { userWarung } = useAppGudang();
-
   const isEdit = modalMode === 'edit' && barangAktif;
 
   // ── 🍏 1. NAMA, KATEGORI & VARIAN BARANG ──
@@ -18,26 +14,40 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const [punyaVarian, setPunyaVarian] = useState(isEdit ? (barangAktif.varian?.length > 0 || false) : false);
   const [varianInput, setVarianInput] = useState(isEdit ? (barangAktif.varian?.join(', ') || '') : '');
 
-  // ── 📥 2. LOGIKA RANTAI: SINKRON VARIABEL RAW VS PWA ──
+  // ── 📥 2. RANTAI SATUAN & KONVERSI (DILENGKAPI FALLBACK KEY FIREBASE) ──
   const [satuanTerbesar, setSatuanTerbesar] = useState(
-    isEdit ? (barangAktif.satuanBeli || barangAktif.satuanTerbesar || barangAktif.satuanModal || 'Dus') : 'Dus'
+    isEdit ? (barangAktif.satuanTerbesar || barangAktif.satuanBeli || barangAktif.satuanModal || 'Dus') : 'Dus'
   );
+
   const [hargaModalAgen, setHargaModalAgen] = useState(
-    isEdit ? (barangAktif.hargaModalAgen || '') : ''
+    isEdit ? (barangAktif.hargaModalAgen || barangAktif.hargaAgen || barangAktif.modalBaru || '') : ''
   );
+
+  // 🎯 FIX TERPENTING: Jangan default ke '40'! Cari semua variabel isi di Firebase
   const [isiKeEceran, setIsiKeEceran] = useState(
-    isEdit ? (barangAktif.isiKeEceran || '40') : '40'
+    isEdit ? (barangAktif.isiKeEceran || barangAktif.isiSatuan || barangAktif.isiPerSatuan || '1') : '1'
   );
+
   const [satuanEceran, setSatuanEceran] = useState(
-    isEdit ? (barangAktif.satuanJual || barangAktif.satuanEceran || 'Pcs') : 'Pcs'
+    isEdit ? (barangAktif.satuanJual || barangAktif.satuanEceran || barangAktif.satuan || 'Pcs') : 'Pcs'
   );
 
-  const [jumlahKonversiGrosir, setJumlahKonversiGrosir] = useState(isEdit ? (barangAktif.minimalBeliGrosir || '10') : '10');
-  const [satuanGrosirNama, setSatuanGrosirNama] = useState(isEdit ? (barangAktif.satuanGrosirNama || 'Renteng') : 'Renteng');
+  const [jumlahKonversiGrosir, setJumlahKonversiGrosir] = useState(
+    isEdit ? (barangAktif.minimalBeliGrosir || '10') : '10'
+  );
 
-  // ── 📤 3. BLOK DATA JUAL TOKO ──
-  const [jualEceran, setJualEceran] = useState(isEdit ? (barangAktif.jual || '') : '');
-  const [jualGrosirTotal, setJualGrosirTotal] = useState(isEdit ? (barangAktif.jualGrosirTotal || '') : '');
+  const [satuanGrosirNama, setSatuanGrosirNama] = useState(
+    isEdit ? (barangAktif.satuanGrosirNama || 'Renteng') : 'Renteng'
+  );
+
+  // ── 📤 3. BLOK HARGA JUAL KASIR ──
+  const [jualEceran, setJualEceran] = useState(
+    isEdit ? (barangAktif.jual || barangAktif.hargaEceran || '') : ''
+  );
+
+  const [jualGrosirTotal, setJualGrosirTotal] = useState(
+    isEdit ? (barangAktif.jualGrosirTotal || barangAktif.jualGrosir || '') : ''
+  );
 
   const daftarKategori = [
     'Sembako/Dapur',
@@ -53,7 +63,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   if (!isOpen) return null;
 
-  // 🧮 LIVE CALCULATION SAKTI
+  // 🧮 LIVE CALCULATION
   const hargaNota = Number(hargaModalAgen) || 0;
   const totalIsiTerkecil = Number(isiKeEceran) || 1;
   const isiPerGrosirMenengah = Number(jumlahKonversiGrosir) || 1;
@@ -61,7 +71,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const modalEceranTerkecil = hargaNota > 0 && totalIsiTerkecil > 0 ? Math.ceil(hargaNota / totalIsiTerkecil) : 0;
   const modalGrosirMenengahTerhitung = Math.ceil(modalEceranTerkecil * isiPerGrosirMenengah);
 
-  // 🛢️ HELPER KONVERSI KG KE LITER
+  // 🛢️ HELPER KONVERSI MINYAK
   const handleKonversiMinyak = () => {
     const beratKg = Number(isiKeEceran) || 0;
     if (beratKg <= 0) {
@@ -81,37 +91,57 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       return; 
     }
 
+    const valJualEceran = jualEceran ? Number(jualEceran) : 0;
+    const valJualGrosirTotal = jualGrosirTotal ? Number(jualGrosirTotal) : 0;
+    const valJualGrosirPerPcs = (valJualGrosirTotal > 0 && isiPerGrosirMenengah > 0)
+      ? Math.round(valJualGrosirTotal / isiPerGrosirMenengah) 
+      : 0;
+
+    // 🎯 PAYLOAD SAKTI: Semua Key Firebase Diisi dengan Rapi & Aman
     onSimpan({
+      // Pertahankan ID & data lama jika sedang mode edit
+      ...(isEdit ? barangAktif : {}),
+
       nama,
       kategori,
-      modal: modalEceranTerkecil, 
-      modalEceran: modalEceranTerkecil,
-      modalEceranTerhitung: modalEceranTerkecil, // 🎯 TAMBAHKAN KEY INI (Hitungan Eceran Siap Pakai!)
-      modalBaru: hargaNota, 
-      jual: jualEceran ? Number(jualEceran) : '', 
-      hargaEceran: jualEceran ? Number(jualEceran) : '', 
-      satuanModal: satuanTerbesar,
-      satuanJual: satuanEceran,
       catatan,
-      varian: punyaVarian ? varianInput.split(',').map(v => v.trim()).filter(v => v !== '') : [],
-      
-      satuanBeli: satuanTerbesar, 
-      hargaAgen: hargaNota,
+      varian: punyaVarian ? varianInput.split(',').map(v => v.trim()).filter(Boolean) : [],
+
+      // 1. Konversi Isi (Disamakan semua biar tidak bentrok 40 vs 120!)
+      isiKeEceran: totalIsiTerkecil,
       isiSatuan: totalIsiTerkecil,
       isiPerSatuan: totalIsiTerkecil,
+      isiGrosirBesar: totalIsiTerkecil,
 
+      // 2. Satuan
       satuanTerbesar,
-      hargaModalAgen: hargaNota > 0 ? hargaNota : '', 
-      isiKeEceran: totalIsiTerkecil,
+      satuanBeli: satuanTerbesar,
+      satuanModal: satuanTerbesar,
+      satuanJual: satuanEceran,
 
-      bisaGrosir: true, 
+      // 3. Modal & Agen (Ganti empty string '' dengan angka 0)
+      hargaModalAgen: hargaNota,
+      hargaAgen: hargaNota,
+      modalBaru: hargaNota,
+      modal: modalEceranTerkecil,
+      modalEceran: modalEceranTerkecil,
+      modalEceranTerhitung: modalEceranTerkecil,
+
+      // 4. Kasir & Harga Jual
+      jual: valJualEceran,
+      hargaEceran: valJualEceran,
+      jualGrosirTotal: valJualGrosirTotal,
+      jualGrosir: valJualGrosirPerPcs,
+
+      // 5. Pengaturan Grosir
+      bisaGrosir: true,
+      bisaGrosirBesar: true,
       satuanGrosirNama: satuanGrosirNama,
       minimalBeliGrosir: isiPerGrosirMenengah,
+      minimalBeliGrosirBesar: totalIsiTerkecil,
       modalGrosirTotal: modalGrosirMenengahTerhitung,
-      
-      jualGrosirTotal: jualGrosirTotal ? Number(jualGrosirTotal) : null,
-      jualGrosir: jualGrosirTotal ? Math.round(Number(jualGrosirTotal) / isiPerGrosirMenengah) : null
     });
+
     onClose();
   };
 
@@ -159,7 +189,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
               <div>
                 <span className={styles.inputLabel}>Total Isi Eceran per {satuanTerbesar}</span>
                 <div className={styles.rowGrid}>
-                  <input type="number" value={isiKeEceran} onChange={(e) => setIsiKeEceran(e.target.value)} placeholder="40" className={styles.boxInput} style={{ width: '45%', borderRadius: '8px 0 0 8px', borderRight: 'none', textAlign: 'center' }} />
+                  <input type="number" value={isiKeEceran} onChange={(e) => setIsiKeEceran(e.target.value)} placeholder="10" className={styles.boxInput} style={{ width: '45%', borderRadius: '8px 0 0 8px', borderRight: 'none', textAlign: 'center' }} />
                   <select value={satuanEceran} onChange={(e) => setSatuanEceran(e.target.value)} className={styles.boxInput} style={{ width: '55%', borderRadius: '0 8px 8px 0', fontWeight: '700' }}>
                     {['Pcs', 'Kg', 'Liter', 'Bungkus', 'Sachet', 'Botol', 'Butir', 'Pack', '¼', 'Galon'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>

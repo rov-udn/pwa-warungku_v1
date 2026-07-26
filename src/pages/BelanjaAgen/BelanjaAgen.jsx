@@ -1,29 +1,32 @@
 import { useState, useMemo, useEffect } from 'react';
-import styles from './BelanjaAgen.module.css'; // 👈 Mengunci CSS Module asli bawaan kamu!
-import SearchBaru from '../../component/SearchBarKategori/SearchBaru'; // 👈 Komponen SearchBaru yang sudah diperbarui
+import styles from './BelanjaAgen.module.css'; 
+import SearchBaru from '../../component/SearchBarKategori/SearchBaru'; 
 
 // 🎯 1. IMPOR CUSTOM HOOK GUDANG GLOBAL DATA TOKO
 import { useAppGudang } from '../../context/useAppGudang.jsx'; 
 
-// 🎯 2. HAPUS PROPS BAWAAN LAMA DI DALAM KURUNG () KARENA DATA DIASUP LANGSUNG DARI GUDANG PUSAT
 function BelanjaAgen() {
-  // 🎯 3. TARIK DATA DAN FUNGSI LANGSUNG DARI GUDANG PUSAT CONTEXT
+  // 🎯 2. TARIK DATA DAN FUNGSI DARI CONTEXT (Beri fallback daftarBarang = [])
   const { 
-    daftarBarang,
+    daftarBarang = [],
     userWarung, 
     handleUpdateHargaModal: onUpdateHargaModal, 
     handleTambahHistoryBelanja: onTambahHistoryBelanja 
   } = useAppGudang();
 
-  // 🔒 STATES LOKAL KHUSUS INTERAKSI UI (TETAP DI SINI)
+  // 🔒 STATES LOKAL KHUSUS INTERAKSI UI
   const [searchTerm, setSearchTerm] = useState('');
   const [kategoriAktif, setKategoriAktif] = useState('Semua'); 
   const [tabAktif, setTabAktif] = useState('pilih'); 
 
   // Auto-load data keranjang lama pas web dibuka
   const [keranjang, setKeranjang] = useState(() => {
-    const dataLokal = localStorage.getItem('keranjang_belanja_agen');
-    return dataLokal ? JSON.parse(dataLokal) : [];
+    try {
+      const dataLokal = localStorage.getItem('keranjang_belanja_agen');
+      return dataLokal ? JSON.parse(dataLokal) : [];
+    } catch {
+      return [];
+    }
   });
 
   // State untuk Modal Pemilih Kriteria
@@ -41,11 +44,13 @@ function BelanjaAgen() {
 
   const daftarKategori = ['Semua', 'Sembako/Dapur', 'Mie/Instan', 'Minuman/Kopi/Susu', 'Rokok/Korek', 'Snack/Biskuit/Roti', 'Sabun/Pembersih', 'Obat-obatan/Medical item', 'plastik/Cup', 'item lain'];
 
-  // FILTER KATEGORI AMAN 100%
+  // FILTER KATEGORI AMAN 100% (Anti Crash jika daftarBarang Kosong)
   const barangFiltered = useMemo(() => {
+    if (!Array.isArray(daftarBarang)) return [];
     return daftarBarang.filter((barang) => {
-      const cocokSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase());
-      const katBarang = (barang.kategori || 'item lain').trim().toLowerCase();
+      const nama = barang?.nama || '';
+      const cocokSearch = nama.toLowerCase().includes(searchTerm.toLowerCase());
+      const katBarang = (barang?.kategori || 'item lain').trim().toLowerCase();
       const katAktifLower = kategoriAktif.toLowerCase();
       
       const cocokKategori = kategoriAktif === 'Semua' || katBarang === katAktifLower;
@@ -58,11 +63,11 @@ function BelanjaAgen() {
     setVarianTerpilih(barang.varian && barang.varian.length > 0 ? barang.varian[0] : ''); 
     setQtyInput(1);
 
-    // 🎯 FIX MUTLAK 1: Ambil hargaModalAgen hasil koreksi nota agar sinkron sejak pertama klik
+    // 🎯 SINKRONISASI HARGA MODAL DENGAN FALLBACK LENGKAP
     const satuanDefault = barang.satuanBeli || barang.satuanModal || 'Dus';
-    const hargaDefault = barang.hargaModalAgen !== undefined && barang.hargaModalAgen !== '' 
+    const hargaDefault = (barang.hargaModalAgen !== undefined && barang.hargaModalAgen !== '')
       ? barang.hargaModalAgen 
-      : (barang.hargaAgen || 0);
+      : (barang.hargaAgen || barang.modalGrosirTotal || 0);
 
     setSatuanTerpilih(satuanDefault);
     setInputHargaModal(hargaDefault);
@@ -72,8 +77,8 @@ function BelanjaAgen() {
   const handleSimpanKeKeranjang = () => {
     if (!barangTerpilih) return;
 
-    const hargaModalFinal = Number(inputHargaModal);
-    const hargaPembanding = barangTerpilih.hargaModalAgen !== undefined && barangTerpilih.hargaModalAgen !== ''
+    const hargaModalFinal = Number(inputHargaModal) || 0;
+    const hargaPembanding = (barangTerpilih.hargaModalAgen !== undefined && barangTerpilih.hargaModalAgen !== '')
       ? barangTerpilih.hargaModalAgen
       : (barangTerpilih.hargaAgen || 0);
     
@@ -87,7 +92,7 @@ function BelanjaAgen() {
       idUnik: `${barangTerpilih.id}-${satuanTerpilih}-${varianTerpilih}-${Date.now()}`,
       id: barangTerpilih.id,
       nama: namaDenganVarian, 
-      qty: Number(qtyInput),
+      qty: Math.max(1, Number(qtyInput) || 1),
       satuanModal: satuanTerpilih,
       modalBaru: hargaModalFinal
     };
@@ -116,7 +121,7 @@ function BelanjaAgen() {
     setKeranjang((prev) =>
       prev.map((item) => {
         if (item.idUnik === idUnik) {
-          return { ...item, modalBaru: Number(hargaBaru) };
+          return { ...item, modalBaru: hargaBaru === '' ? '' : Number(hargaBaru) };
         }
         return item;
       })
@@ -124,19 +129,16 @@ function BelanjaAgen() {
   };
 
   const hitungTotalEstimasi = () => {
-    return keranjang.reduce((total, item) => total + (item.qty * item.modalBaru), 0);
+    return keranjang.reduce((total, item) => total + ((Number(item.qty) || 0) * (Number(item.modalBaru) || 0)), 0);
   };
 
   const handleShareUniversal = async () => {
     if (keranjang.length === 0) return;
 
-    // 🎯 1. AMBIL NAMA TOKO DINAMIS SECARA LIVE
     const namaTokoNota = userWarung ? userWarung.namaWarung : 'BUKU WARUNG';
-
     const tgl = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' });
     const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-    // 🎯 2. UBAH BARIS INI JADI DINAMIS (Menggunakan namaTokoNota)
     let teksNota = `🏪 *PESANAN BARANG - ${namaTokoNota.toUpperCase()}*\n`; 
     teksNota += `📅 ${tgl} | ⏰ ${jam} WIB\n`;
     teksNota += `--------------------------------\n\n`;
@@ -145,7 +147,7 @@ function BelanjaAgen() {
     const kelompokKategori = {};
 
     keranjang.forEach((item) => {
-      const barangAsli = daftarBarang.find(b => b.id === item.id);
+      const barangAsli = (daftarBarang || []).find(b => String(b.id) === String(item.id));
       const namaKategori = (barangAsli?.kategori || 'item lain').trim();
 
       if (!kelompokKategori[namaKategori]) {
@@ -177,7 +179,6 @@ function BelanjaAgen() {
 
     if (navigator.share) {
       try {
-        // 🎯 3. UBAH TITLE DI SINI JUGA AGAR DINAMIS SAAT DI-SHARE
         await navigator.share({ title: `Pesanan ${namaTokoNota}`, text: teksNota });
         
         if (typeof onTambahHistoryBelanja === 'function') {
@@ -246,8 +247,7 @@ function BelanjaAgen() {
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, {userWarung ? userWarung.pemilik : 'Bos'}. 🧐</div>
             ) : (
               barangFiltered.map((barang) => {
-                // 🎯 FIX MUTLAK 2: Kartu daftar luar memprioritaskan hargaModalAgen riil terbaru
-                const modalTerupdate = barang.hargaModalAgen !== undefined && barang.hargaModalAgen !== '' 
+                const modalTerupdate = (barang.hargaModalAgen !== undefined && barang.hargaModalAgen !== '') 
                   ? barang.hargaModalAgen 
                   : (barang.hargaAgen || 0);
 
@@ -255,7 +255,7 @@ function BelanjaAgen() {
                   <div key={barang.id} onClick={() => handleKlikTambah(barang)} className={styles.cardPilihItem}>
                     <div className={styles.infoKiri}>
                       <h4>{barang.nama}</h4>
-                      <span>M: Rp {modalTerupdate.toLocaleString('id-ID')} / {barang.satuanModal || 'Dus'}</span>
+                      <span>M: Rp {modalTerupdate.toLocaleString('id-ID')} / {barang.satuanBeli || barang.satuanModal || 'Dus'}</span>
                     </div>
                     <div className={styles.indicatorPilih}>
                       + Keranjang
@@ -304,7 +304,7 @@ function BelanjaAgen() {
                           className={styles.inputHarga} 
                         />
                         <div className={styles.totalHargaRow}>
-                          Rp {(item.qty * item.modalBaru).toLocaleString('id-ID')}
+                          Rp {((Number(item.qty) || 0) * (Number(item.modalBaru) || 0)).toLocaleString('id-ID')}
                         </div>
                       </div>
                     </div>
@@ -369,8 +369,7 @@ function BelanjaAgen() {
                 const options = [];
                 
                 const unitBesar = barangTerpilih.satuanBeli || barangTerpilih.satuanModal || 'Dus';
-                // 🎯 FIX MUTLAK 3: Ambil hargaModalAgen terupdate saat tombol satuan diklik
-                const hargaTerupdateBesar = barangTerpilih.hargaModalAgen !== undefined && barangTerpilih.hargaModalAgen !== '' 
+                const hargaTerupdateBesar = (barangTerpilih.hargaModalAgen !== undefined && barangTerpilih.hargaModalAgen !== '') 
                   ? barangTerpilih.hargaModalAgen 
                   : (barangTerpilih.hargaAgen || 0);
 
