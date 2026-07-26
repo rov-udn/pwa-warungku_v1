@@ -37,41 +37,47 @@ const perPieceFromTotal = (total, units) => {
 // 🛡️ GARDA PENGAMAN: Memastikan 100% variabel barang lengkap sebelum masuk DB / LocalStorage
 const sanitizeBarang = (item) => {
   const modalEceran = Number(item.modal) || Number(item.modalEceran) || 0;
-  const hargaModalAgen = Number(item.hargaModalAgen) || Number(item.hargaAgen) || 0;
+  const hargaModalAgen = Number(item.hargaModalAgen) || Number(item.hargaAgen) || Number(item.modalBaru) || 0;
   const hargaJualEceran = Number(item.jual) || Number(item.hargaEceran) || 0;
-  
-  const isiGrosirBesar = Number(item.isiGrosirBesar) > 0 ? Number(item.isiGrosirBesar) : 40;
-  const jualGrosirBesarTotal = Number(item.jualGrosirBesarTotal) > 0 ? Number(item.jualGrosirBesarTotal) : hargaModalAgen;
 
-  // 🎯 FIX: Hitung otomatis harga per Pcs jika jualGrosirBesarPerPcs bernilai 0 / falsy
+  // 🎯 1. AMBIL ANGKA ISI ECERAN (BISA BACA DARI FIELD LAMA ATAU BARU)
+  const isiEceranFix = Number(item.isiGrosirBesar) > 0 && Number(item.isiGrosirBesar) !== 40
+    ? Number(item.isiGrosirBesar)
+    : (Number(item.isiKeEceran) || Number(item.isiPerSatuan) || Number(item.isiSatuan) || 40);
+
+  const jualGrosirBesarTotal = Number(item.jualGrosirBesarTotal) > 0 
+    ? Number(item.jualGrosirBesarTotal) 
+    : hargaModalAgen;
+
   const hitungJualGrosirBesarPerPcs = Number(item.jualGrosirBesarPerPcs) > 0 
     ? Number(item.jualGrosirBesarPerPcs) 
-    : Math.ceil(jualGrosirBesarTotal / isiGrosirBesar);
+    : (isiEceranFix > 0 ? Math.ceil(jualGrosirBesarTotal / isiEceranFix) : 0);
 
+  // 🎯 2. KEMBALIKAN HANYA SKEMA STANDAR YANG BERSIH
   return {
     id: item.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     nama: item.nama || 'Tanpa Nama',
     modal: modalEceran,
     hargaModalAgen: hargaModalAgen,
     jual: hargaJualEceran,
-    satuanModal: item.satuanModal || item.satuanBeli || 'Slop',
+    satuanModal: item.satuanModal || item.satuanBeli || item.satuanTerbesar || 'Slop',
     satuanJual: item.satuanJual || 'Bungkus',
     
-    // 🎯 VARIABEL GROSIR BESAR (SUDAH AMAN DARI NILAI 0)
-    isiGrosirBesar: isiGrosirBesar,
+    // 🎯 HANYA PAKAI 1 FIELD STANDAR INI DENGAN ANGKA 120
+    isiGrosirBesar: isiEceranFix, 
     bisaGrosirBesar: item.bisaGrosirBesar !== undefined ? Boolean(item.bisaGrosirBesar) : false,
-    minimalBeliGrosirBesar: Number(item.minimalBeliGrosirBesar) > 0 ? Number(item.minimalBeliGrosirBesar) : isiGrosirBesar,
-    satuanGrosirBesarNama: item.satuanGrosirBesarNama || 'Dus',
+    minimalBeliGrosirBesar: Number(item.minimalBeliGrosirBesar) > 0 ? Number(item.minimalBeliGrosirBesar) : isiEceranFix,
+    satuanGrosirBesarNama: item.satuanGrosirBesarNama || item.satuanTerbesar || 'Dus',
     jualGrosirBesarTotal: jualGrosirBesarTotal,
     jualGrosirBesarPerPcs: hitungJualGrosirBesarPerPcs,
 
-    // 🎯 VARIABEL GROSIR MENENGAH (RENTENG/PACK/SLOP)
+    // Grosir Menengah
     bisaGrosir: item.bisaGrosir !== undefined ? Boolean(item.bisaGrosir) : true,
     minimalBeliGrosir: Number(item.minimalBeliGrosir) > 0 ? Number(item.minimalBeliGrosir) : 10,
     satuanGrosirNama: item.satuanGrosirNama || 'Slop',
     jualGrosir: Number(item.jualGrosir) || hargaJualEceran,
 
-    // 🎯 METADATA TAMBAHAN
+    // Metadata
     varian: Array.isArray(item.varian) ? item.varian : [],
     catatan: item.catatan || '',
     stok: Number(item.stok) || 0,
