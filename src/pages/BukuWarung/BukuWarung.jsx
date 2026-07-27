@@ -107,6 +107,7 @@ function BukuWarung() {
       return cocokSearch && cocokKategori;
     });
   }, [daftarBarang, searchTerm, kategoriAktif, filterRugiAktif]);
+
   const hitungMarginCuan = (hargaModal, hargaJual) => {
     const modal = Number(hargaModal) || 0;
     const jual = Number(hargaJual) || 0;
