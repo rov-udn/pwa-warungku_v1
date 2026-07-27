@@ -45,22 +45,30 @@ function BukuWarung() {
     'item lain'
   ];
 
-  // ── 🎯 FILTER RUGI AKURAT (SOLUSI BUG FALLBACK '40') ──
+  // ── 🎯 FILTER RUGI AKURAT & BEBAS BUG ──
   const jumlahBarangRugi = useMemo(() => {
     return daftarBarang.filter(barang => {
       const hargaJualEceran = Number(barang.jual || barang.hargaEceran) || 0;
-      const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen || barang.modalBaru) || 0;
       
-      if (!hargaJualEceran || !hargaModalAgen) return false; 
+      // 🎯 UTAMAKAN barang.modal (Modal Per-Pcs Baku dari sanitizeBarang)
+      let modalEceranRiil = Number(barang.modal) || 0;
 
-      // 🎯 Fix: Jangan pernah default ke 40, pakailah fallback '1'
-      const totalIsiPcs = Number(barang.isiKeEceran || barang.isiSatuan || barang.isiPerSatuan || barang.jumlahIsi) || 1;
+      // Jika barang.modal belum terisi, baru hitung dari hargaModalAgen / isiKeEceran
+      if (modalEceranRiil <= 0) {
+        const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
+        const totalIsiPcs = Number(barang.isiKeEceran || barang.isiSatuan) || 1;
+        modalEceranRiil = hargaModalAgen > 0 ? Math.ceil(hargaModalAgen / totalIsiPcs) : 0;
+      }
       
-      const modalEceranRiil = hargaModalAgen / totalIsiPcs;
+      if (!hargaJualEceran || !modalEceranRiil) return false; 
+
+      // Pengecekan Rugi Eceran
       const isEceranRugi = hargaJualEceran < modalEceranRiil;
 
-      const isGrosirRugi = barang.bisaGrosir && barang.jualGrosirTotal && barang.modalGrosirTotal 
-        ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
+      // Pengecekan Rugi Grosir (Hanya jika grosir benar-benar aktif & harga jual grosir > 0)
+      const isGrosirAktif = Boolean(barang.bisaGrosir) && Number(barang.jualGrosirTotal) > 0;
+      const isGrosirRugi = isGrosirAktif 
+        ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal || barang.hargaModalAgen) 
         : false;
 
       return isEceranRugi || isGrosirRugi;
@@ -75,14 +83,20 @@ function BukuWarung() {
       const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
       
       const hargaJualEceran = Number(barang.jual || barang.hargaEceran) || 0;
-      const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen || barang.modalBaru) || 0;
-      const totalIsiPcs = Number(barang.isiKeEceran || barang.isiSatuan || barang.isiPerSatuan || barang.jumlahIsi) || 1;
       
-      const modalEceranRiil = hargaModalAgen / totalIsiPcs;
-      const isEceranRugi = (hargaJualEceran > 0 && hargaModalAgen > 0) ? (hargaJualEceran < modalEceranRiil) : false;
+      // 🎯 UTAMAKAN barang.modal (Modal Per-Pcs Baku)
+      let modalEceranRiil = Number(barang.modal) || 0;
+      if (modalEceranRiil <= 0) {
+        const hargaModalAgen = Number(barang.hargaModalAgen || barang.hargaAgen) || 0;
+        const totalIsiPcs = Number(barang.isiKeEceran || barang.isiSatuan) || 1;
+        modalEceranRiil = hargaModalAgen > 0 ? Math.ceil(hargaModalAgen / totalIsiPcs) : 0;
+      }
       
-      const isGrosirRugi = barang.bisaGrosir && barang.jualGrosirTotal && barang.modalGrosirTotal 
-        ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal) 
+      const isEceranRugi = (hargaJualEceran > 0 && modalEceranRiil > 0) ? (hargaJualEceran < modalEceranRiil) : false;
+      
+      const isGrosirAktif = Boolean(barang.bisaGrosir) && Number(barang.jualGrosirTotal) > 0;
+      const isGrosirRugi = isGrosirAktif 
+        ? Number(barang.jualGrosirTotal) < Number(barang.modalGrosirTotal || barang.hargaModalAgen) 
         : false;
         
       const apakahRugi = isEceranRugi || isGrosirRugi;
@@ -93,7 +107,6 @@ function BukuWarung() {
       return cocokSearch && cocokKategori;
     });
   }, [daftarBarang, searchTerm, kategoriAktif, filterRugiAktif]);
-  
   const hitungMarginCuan = (hargaModal, hargaJual) => {
     const modal = Number(hargaModal) || 0;
     const jual = Number(hargaJual) || 0;
