@@ -1,4 +1,4 @@
-import { db } from '../firebase/config'; // Sesuaikan lokasi config firebase kamu
+import { db } from '../firebase.js'; // Sesuaikan lokasi config firebase kamu
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
 /**
@@ -8,6 +8,33 @@ const safeNumber = (val, fallback = 0) => {
   if (val === undefined || val === null || val === '') return fallback;
   const num = Number(val);
   return isNaN(num) ? fallback : num;
+};
+
+
+/**
+ * 📥 Memproses teks JSON dari Modal Import
+ * Mengubah string JSON/Array menjadi data terstruktur bersih
+ */
+export const importAndTransformJSON = (jsonString) => {
+  try {
+    const rawData = JSON.parse(jsonString);
+    const dataArray = Array.isArray(rawData) ? rawData : [rawData];
+
+    // Bersihkan setiap dokumen menggunakan transformFirestoreDoc
+    const cleanedData = dataArray.map((item) => transformFirestoreDoc(item));
+
+    return {
+      success: true,
+      data: cleanedData,
+    };
+  } catch (err) {
+    // Variabel 'err' dipakai di sini untuk console.error
+    console.error("Gagal parsing JSON:", err);
+    return {
+      success: false,
+      error: "Format JSON tidak valid! Pastikan format teks JSON sudah benar.",
+    };
+  }
 };
 
 /**
