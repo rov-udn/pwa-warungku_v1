@@ -34,54 +34,69 @@ const perPieceFromTotal = (total, units) => {
   return Math.ceil(t / u);
 };
 
-// 🛡️ GARDA PENGAMAN: Memastikan 100% variabel barang lengkap sebelum masuk DB / LocalStorage
+// 🛡️ GARDA PENGAMAN: Memastikan 100% variabel barang bersih & presisi
 const sanitizeBarang = (item) => {
-  const modalEceran = Number(item.modal) || Number(item.modalEceran) || 0;
-  const hargaModalAgen = Number(item.hargaModalAgen) || Number(item.hargaAgen) || Number(item.modalBaru) || 0;
-  const hargaJualEceran = Number(item.jual) || Number(item.hargaEceran) || 0;
+  const safeNumber = (v, fallback = 0) => {
+    if (v === '' || v === null || v === undefined) return fallback;
+    const n = Number(v);
+    return Number.isNaN(n) ? fallback : n;
+  };
 
-  // 🎯 1. AMBIL ANGKA ISI ECERAN (BISA BACA DARI FIELD LAMA ATAU BARU)
-  const isiEceranFix = Number(item.isiGrosirBesar) > 0 && Number(item.isiGrosirBesar) !== 40
-    ? Number(item.isiGrosirBesar)
-    : (Number(item.isiKeEceran) || Number(item.isiPerSatuan) || Number(item.isiSatuan) || 40);
+  const safeString = (v, fallback = '') => {
+    if (v === undefined || v === null) return fallback;
+    return String(v).trim();
+  };
 
-  const jualGrosirBesarTotal = Number(item.jualGrosirBesarTotal) > 0 
-    ? Number(item.jualGrosirBesarTotal) 
-    : hargaModalAgen;
+  // 🎯 1. HARGA NOTA / MODAL AGEN (Satuan Terbesar)
+  const hargaModalAgen = safeNumber(
+    item.hargaModalAgen ?? item.hargaAgen ?? item.modalBaru ?? item.modalAgen,
+    0
+  );
 
-  const hitungJualGrosirBesarPerPcs = Number(item.jualGrosirBesarPerPcs) > 0 
-    ? Number(item.jualGrosirBesarPerPcs) 
-    : (isiEceranFix > 0 ? Math.ceil(jualGrosirBesarTotal / isiEceranFix) : 0);
+  // 🎯 2. ISI PCS DALAM PAKET/DUS (JANGAN PERNAH DEFAULT 40! Pakai fallback 1)
+  const isiKeEceran = safeNumber(
+    item.isiKeEceran ?? item.isiGrosirBesar ?? item.isiPerSatuan ?? item.isiSatuan ?? item.jumlahIsi,
+    1
+  ) || 1;
 
-  // 🎯 2. KEMBALIKAN HANYA SKEMA STANDAR YANG BERSIH
+  // 🎯 3. HITUNG MODAL ECERAN RIIL PER PCS
+  const modalEceranRiil = hargaModalAgen > 0 && isiKeEceran > 0
+    ? Math.ceil(hargaModalAgen / isiKeEceran)
+    : safeNumber(item.modal ?? item.modalEceran, 0);
+
+  // 🎯 4. HARGA JUAL ECERAN & GROSIR
+  const hargaJualEceran = safeNumber(item.jual ?? item.hargaEceran ?? item.jualEceran, 0);
+  const bisaGrosir = item.bisaGrosir !== undefined ? Boolean(item.bisaGrosir) : false;
+  const jualGrosirTotal = safeNumber(item.jualGrosirTotal ?? item.jualGrosir, 0);
+  const modalGrosirTotal = safeNumber(item.modalGrosirTotal ?? hargaModalAgen, 0);
+
+  // 🎯 5. KEMBALIKAN SKEMA CLEAN & UNIFORM
   return {
-    id: item.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-    nama: item.nama || 'Tanpa Nama',
-    modal: modalEceran,
-    hargaModalAgen: hargaModalAgen,
-    jual: hargaJualEceran,
-    satuanModal: item.satuanModal || item.satuanBeli || item.satuanTerbesar || 'Slop',
-    satuanJual: item.satuanJual || 'Bungkus',
+    id: item.id || `BARANG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    nama: safeString(item.nama || item.namaBarang, 'Tanpa Nama'),
+    kategori: safeString(item.kategori, 'item lain'),
     
-    // 🎯 HANYA PAKAI 1 FIELD STANDAR INI DENGAN ANGKA 120
-    isiGrosirBesar: isiEceranFix, 
-    bisaGrosirBesar: item.bisaGrosirBesar !== undefined ? Boolean(item.bisaGrosirBesar) : false,
-    minimalBeliGrosirBesar: Number(item.minimalBeliGrosirBesar) > 0 ? Number(item.minimalBeliGrosirBesar) : isiEceranFix,
-    satuanGrosirBesarNama: item.satuanGrosirBesarNama || item.satuanTerbesar || 'Dus',
-    jualGrosirBesarTotal: jualGrosirBesarTotal,
-    jualGrosirBesarPerPcs: hitungJualGrosirBesarPerPcs,
+    // Core Math Fields (Konsisten dengan BukuWarung.jsx)
+    hargaModalAgen: hargaModalAgen,
+    modal: modalEceranRiil,
+    jual: hargaJualEceran,
+    isiKeEceran: isiKeEceran,
 
-    // Grosir Menengah
-    bisaGrosir: item.bisaGrosir !== undefined ? Boolean(item.bisaGrosir) : true,
-    minimalBeliGrosir: Number(item.minimalBeliGrosir) > 0 ? Number(item.minimalBeliGrosir) : 10,
-    satuanGrosirNama: item.satuanGrosirNama || 'Slop',
-    jualGrosir: Number(item.jualGrosir) || hargaJualEceran,
+    // Satuan
+    satuanTerbesar: safeString(item.satuanTerbesar || item.satuanModal || item.satuanBeli, 'Dus'),
+    satuanJual: safeString(item.satuanJual, 'Pcs'),
 
-    // Metadata
+    // Fitur Grosir (Default Mati jika tidak diset)
+    bisaGrosir: bisaGrosir,
+    minimalBeliGrosir: safeNumber(item.minimalBeliGrosir ?? item.minGrosir, 0),
+    satuanGrosirNama: safeString(item.satuanGrosirNama, 'Renteng'),
+    jualGrosirTotal: jualGrosirTotal,
+    modalGrosirTotal: modalGrosirTotal,
+
+    // Pelengkap & Metadata
     varian: Array.isArray(item.varian) ? item.varian : [],
-    catatan: item.catatan || '',
-    stok: Number(item.stok) || 0,
-    kategori: item.kategori || 'Umum'
+    catatan: safeString(item.catatan),
+    stok: safeNumber(item.stok, 0)
   };
 };
 
@@ -550,30 +565,30 @@ export function AppProvider({ children }) {
   }
 }, [persistAndSync, STORAGE_KEYS.barang]);
 
-// 🧹 FUNGSI PEMBERSIH DATA DENGAN SAFETY STATE
+// 🧹 FUNGSI PEMBERSIH AMAN
 const handleBersihkanDataDatabase = useCallback(() => {
   if (!userWarung) {
     alert("❌ Kamu harus login dulu, Bos!");
     return;
   }
 
-  const konfirmasi = window.confirm(
-    "⚠️ PERINGATAN PEMBERSIHAN DATABASE:\n\n" +
-    "Fungsi ini akan merapikan seluruh nama field barang (hapus isiKeEceran, isiPerSatuan, dll, serta membetulkan harga per pcs) TANPA menghapus stok atau nama barang.\n\n" +
-    "Lanjutkan pembersihan?"
-  );
-
+  const konfirmasi = window.confirm("⚠️ Rapikan & bersihkan seluruh database?");
   if (!konfirmasi) return;
 
   try {
-    // 🎯 GUNAKAN PREV STATE AGAR SELALU AMAN & AMBIL DATA TERBARU
     setDaftarBarang((prevBarang) => {
-      const dataBersih = prevBarang.map((barang) => sanitizeBarang(barang));
+      // 🛡️ GARANSI ARRAY: Antisipasi jika prevBarang bukan array murni
+      const listBarang = Array.isArray(prevBarang) 
+        ? prevBarang 
+        : Object.values(prevBarang || {});
+
+      // 🧹 Clean up dengan sanitizeBarang versi presisi
+      const dataBersih = listBarang.map((barang) => sanitizeBarang(barang));
       
-      // Sync ke LocalStorage & Firebase
+      // 💾 Menimpa total LocalStorage & Firebase RTDB
       persistAndSync(STORAGE_KEYS.barang, dataBersih);
       
-      alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} data barang berhasil dibersihkan dan dirapikan di Firebase!`);
+      alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} barang berhasil dirapikan!`);
       return dataBersih;
     });
   } catch (error) {
