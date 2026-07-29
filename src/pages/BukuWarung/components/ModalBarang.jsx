@@ -1,52 +1,44 @@
 import { useState } from 'react';
 import styles from './ModalBarang.module.css';
-
 import { useAppGudang } from '../../../context/useAppGudang.jsx'; 
 
 function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
   const { userWarung } = useAppGudang();
-  const isEdit = modalMode === 'edit' && barangAktif;
+  const isEdit = modalMode === 'edit' && Boolean(barangAktif);
 
-  // ── 🍏 1. NAMA, KATEGORI & VARIAN BARANG ──
+  // ── 🍏 1. NAMA, KATEGORI & VARIAN BARANG (Langsung inisialisasi awal) ──
   const [nama, setNama] = useState(isEdit ? (barangAktif.nama || '') : '');
   const [kategori, setKategori] = useState(isEdit ? (barangAktif.kategori || 'item lain') : 'item lain');
   const [catatan, setCatatan] = useState(isEdit ? (barangAktif.catatan || barangAktif.catatanUtama || '') : '');
-  const [punyaVarian, setPunyaVarian] = useState(isEdit ? (barangAktif.varian?.length > 0 || false) : false);
+  const [punyaVarian, setPunyaVarian] = useState(isEdit ? (barangAktif.varian?.length > 0) : false);
   const [varianInput, setVarianInput] = useState(isEdit ? (barangAktif.varian?.join(', ') || '') : '');
 
-  // ── 📥 2. RANTAI SATUAN & KONVERSI (DILENGKAPI FALLBACK KEY FIREBASE) ──
+  // ── 📥 2. RANTAI SATUAN & KONVERSI ──
   const [satuanTerbesar, setSatuanTerbesar] = useState(
-    isEdit ? (barangAktif.satuanTerbesar || 'Dus') : 'Dus'
+    isEdit ? (barangAktif.satuanTerbesar || barangAktif.satuanBeli || 'Dus') : 'Dus'
   );
-
   const [hargaModalAgen, setHargaModalAgen] = useState(
-    isEdit ? (barangAktif.hargaModalAgen || '') : ''
+    isEdit ? (barangAktif.hargaModalAgen ?? '') : ''
   );
-
-  // 🎯 FIX TERPENTING: Jangan default ke '40'! Cari semua variabel isi di Firebase
   const [isiKeEceran, setIsiKeEceran] = useState(
-    isEdit ? (barangAktif.isiKeEceran || '1') : '1'
+    isEdit ? (barangAktif.isiKeEceran ?? '1') : '1'
   );
-
   const [satuanEceran, setSatuanEceran] = useState(
     isEdit ? (barangAktif.satuanJual || 'Pcs') : 'Pcs'
   );
-
   const [jumlahKonversiGrosir, setJumlahKonversiGrosir] = useState(
-    isEdit ? (barangAktif.minimalBeliGrosir || '10') : '10'
+    isEdit ? (barangAktif.minimalBeliGrosir ?? '10') : '10'
   );
-
   const [satuanGrosirNama, setSatuanGrosirNama] = useState(
     isEdit ? (barangAktif.satuanGrosirNama || 'Renteng') : 'Renteng'
   );
 
   // ── 📤 3. BLOK HARGA JUAL KASIR ──
   const [jualEceran, setJualEceran] = useState(
-    isEdit ? (barangAktif.jual || '') : ''
+    isEdit ? (barangAktif.jual ?? '') : ''
   );
-
   const [jualGrosirTotal, setJualGrosirTotal] = useState(
-    isEdit ? (barangAktif.jualGrosirTotal || '') : ''
+    isEdit ? (barangAktif.jualGrosirTotal ?? '') : ''
   );
 
   const daftarKategori = [
@@ -86,7 +78,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!nama) { 
+    if (!nama.trim()) { 
       alert("Nama Barang wajib diisi ya, " + (userWarung ? userWarung.pemilik : 'Bos') + "!"); 
       return; 
     }
@@ -97,17 +89,16 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       ? Math.round(valJualGrosirTotal / isiPerGrosirMenengah) 
       : 0;
 
-    // 🎯 PAYLOAD SAKTI: Semua Key Firebase Diisi dengan Rapi & Aman
+    // 🎯 PAYLOAD BAKU
     onSimpan({
-      // Pertahankan ID & data lama jika sedang mode edit
       ...(isEdit ? barangAktif : {}),
 
-      nama,
+      nama: nama.trim(),
       kategori,
       catatan,
       varian: punyaVarian ? varianInput.split(',').map(v => v.trim()).filter(Boolean) : [],
 
-      // 1. Konversi Isi (Disamakan semua biar tidak bentrok 40 vs 120!)
+      // 1. Konversi Isi
       isiKeEceran: totalIsiTerkecil,
 
       // 2. Satuan
@@ -126,7 +117,7 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       jualGrosir: valJualGrosirPerPcs,
 
       // 5. Pengaturan Grosir
-      bisaGrosir: true,
+      bisaGrosir: valJualGrosirTotal > 0,
       bisaGrosirBesar: true,
       satuanGrosirNama: satuanGrosirNama,
       minimalBeliGrosir: isiPerGrosirMenengah,

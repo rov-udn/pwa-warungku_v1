@@ -5,7 +5,7 @@ import styles from './HistoryWarung.module.css';
 import { useAppGudang } from '../../context/useAppGudang.jsx';
 
 function HistoryWarung() {
-  // 🎯 2. TARIK DATA & FUNGSI DARI CONTEXT (Tambahkan fallback [] agar anti-crash)
+  // 🎯 2. TARIK DATA & FUNGSI DARI CONTEXT (Fallback [] agar anti-crash)
   const { 
     historyBelanja = [], 
     logPerubahanHarga = [],
@@ -16,11 +16,12 @@ function HistoryWarung() {
 
   const [tabAktif, setTabAktif] = useState('rekap'); // 'rekap' atau 'log'
   
-  // State untuk membuka detail nota dan mode koreksi terpisah
+  // State untuk membuka detail nota dan mode koreksi
   const [selectedNota, setSelectedNota] = useState(null);
   const [notaSedangDiedit, setNotaSedangDiedit] = useState(null);
   const [itemsKoreksi, setItemsKoreksi] = useState([]);
 
+  // Helper Pengurutan Waktu Nota
   const getNotaTimestamp = (nota) => {
     if (!nota) return 0;
     const parts = String(nota.id || '').split('-');
@@ -30,7 +31,10 @@ function HistoryWarung() {
     return Number.isNaN(tanggal.getTime()) ? 0 : tanggal.getTime();
   };
 
-  const sortedHistoryBelanja = [...historyBelanja].sort((a, b) => getNotaTimestamp(b) - getNotaTimestamp(a));
+  const safeHistory = Array.isArray(historyBelanja) ? historyBelanja : [];
+  const safeLogHarga = Array.isArray(logPerubahanHarga) ? logPerubahanHarga : [];
+
+  const sortedHistoryBelanja = [...safeHistory].sort((a, b) => getNotaTimestamp(b) - getNotaTimestamp(a));
 
   const changeTab = (tab) => {
     setTabAktif(tab);
@@ -50,9 +54,8 @@ function HistoryWarung() {
     setNotaSedangDiedit(nota);
     setSelectedNota(null);
         
-    const itemsPecahReferensi = nota.items.map((item, idx) => {
-      // Pastikan perbandingan ID barang menggunakan String/Number fleksibel
-      const barangAsli = daftarBarang.find(b => String(b.id) === String(item.id));
+    const itemsPecahReferensi = (nota?.items || []).map((item, idx) => {
+      const barangAsli = (daftarBarang || []).find(b => String(b.id) === String(item.id));
       let isiPembagi = 1;
       const satuanNotaKecil = (item.satuanModal || '').toLowerCase();
       
@@ -64,7 +67,7 @@ function HistoryWarung() {
       return {
         ...item,
         idUnik: stableIdUnik,
-        modalBaru: Number(item.modalBaru) || 0,
+        modalBaru: item.modalBaru ?? 0,
         isiKeEceran: isiPembagi
       };
     });
@@ -95,12 +98,11 @@ function HistoryWarung() {
     const totalPengeluaranBaru = dataValid.reduce((sum, item) => sum + (item.qty * item.modalBaru), 0);
     const namaPanggilan = userWarung ? userWarung.pemilik : 'Bos';
 
-    if (window.confirm(`Simpan pencocokan harga nota ini ${namaPanggilan}? Harga Modal Eceran di Gudang Utama akan langsung diperbarui otomatis!`)) {
+    if (window.confirm(`Simpan pencocokan harga nota ini, ${namaPanggilan}? Harga Modal Eceran di Gudang Utama akan langsung diperbarui otomatis!`)) {
       
       const dataSinkronGudang = dataValid.map(item => {
         const totalIsi = Number(item.isiKeEceran) || 1;
         const hargaNotaAgen = Number(item.modalBaru) || 0;
-        // 🎯 FIX: Presisi harga eceran tanpa Math.ceil berlebih
         const modalEceranTerkecil = totalIsi > 0 ? (hargaNotaAgen / totalIsi) : hargaNotaAgen;
 
         return {
@@ -110,7 +112,9 @@ function HistoryWarung() {
         };
       });
 
-      onKoreksiNota(notaSedangDiedit.id, dataSinkronGudang, totalPengeluaranBaru);
+      if (typeof onKoreksiNota === 'function') {
+        onKoreksiNota(notaSedangDiedit.id, dataSinkronGudang, totalPengeluaranBaru);
+      }
       setNotaSedangDiedit(null);
       setItemsKoreksi([]);
     }
@@ -121,7 +125,7 @@ function HistoryWarung() {
   if (notaSedangDiedit) {
     const totalKoreksiBerjalan = itemsKoreksi.reduce((sum, item) => {
       const q = Number(item.qty) || 0;
-      const m = Number(item.modalBaru) || 0;
+      const m = item.modalBaru === '' ? 0 : Number(item.modalBaru);
       return sum + (q * m);
     }, 0);
 
@@ -150,7 +154,7 @@ function HistoryWarung() {
                     </span>
                   </div>
                   
-                  {/* 🎯 SUNTIKAN CYAN GLOW BAGIAN UTAMA ECERAN */}
+                  {/* 🎯 CYAN GLOW BAGIAN UTAMA ECERAN */}
                   <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', backgroundColor: 'var(--bg-nav-active)', padding: '4px 8px', borderRadius: '6px', fontWeight: '800', border: '1px solid rgba(0,245,255,0.15)' }}>
                     Eceran: Rp {modalPcsEstimasi.toLocaleString('id-ID')}
                   </span>
@@ -194,10 +198,8 @@ function HistoryWarung() {
         <div className={styles.cardNota} style={{ marginTop: '16px', backgroundColor: 'var(--bg-toggle, #f2f2f7)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light, #eef0f3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '800', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Total Nota Tervalidasi:</span>
-            {/* 🎯 WARNA ESTIMASI MENYALA BIRU ELECTRIC */}
             <span style={{ color: 'var(--accent-cyan)', fontSize: '1.25rem', fontWeight: '900', textShadow: '0 0 10px rgba(0,245,255,0.2)' }}>Rp {totalKoreksiBerjalan.toLocaleString('id-ID')}</span>
           </div>
-          {/* 🎯 TOMBOL EKSEKUSI GANTI JADI BIRU ELECTRIC PREMIUM */}
           <button type="button" onClick={handleEksekusiSimpan} style={{ width: '100%', padding: '12px', backgroundColor: 'var(--accent-neon, #0055ff)', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: '800', fontSize: '0.95rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(0, 85, 255, 0.4)' }}>
             💾 Simpan & Update Gudang
           </button>
@@ -255,7 +257,6 @@ function HistoryWarung() {
 
                 <div className={styles.totalRow} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
                   <span style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>Total Pengeluaran:</span>
-                  {/* 🎯 TOTAL PENGELUARAN CYAN NEON */}
                   <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(nota.totalPengeluarannya || nota.items?.reduce((s,i)=>s+(i.qty*(Number(i.modalBaru) || 0)),0) || 0).toLocaleString('id-ID')}</span>
                 </div>
               </div>
@@ -298,10 +299,10 @@ function HistoryWarung() {
 
       {tabAktif === 'log' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {logPerubahanHarga.length === 0 ? (
+          {safeLogHarga.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', fontSize: '0.85rem' }}>Belum ada pergerakan naik-turun harga modal agen.</p>
           ) : (
-            logPerubahanHarga.map((log, idx) => {
+            safeLogHarga.map((log, idx) => {
               const modalLama = Number(log.modalLama) || 0;
               const modalBaru = Number(log.modalBaru) || 0;
               const apakahNaik = modalBaru > modalLama;
@@ -315,7 +316,6 @@ function HistoryWarung() {
                   </div>
                   <div className={styles.logKanan} style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Perubahan Modal:</div>
-                    {/* 🎯 MODAL NAIK MERAH NEON, MODAL TURUN CYAN GLOW */}
                     <span style={{ color: apakahNaik ? '#ff4d4d' : 'var(--accent-cyan)', fontWeight: '800', fontSize: '0.85rem' }}>
                       Rp {modalLama.toLocaleString('id-ID')} ➔ Rp {modalBaru.toLocaleString('id-ID')}
                     </span>

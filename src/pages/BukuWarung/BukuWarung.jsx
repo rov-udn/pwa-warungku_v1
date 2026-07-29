@@ -45,26 +45,20 @@ function BukuWarung() {
     'item lain'
   ];
 
-  // ── 🎯 FILTER RUGI PRESISI (Sesuai Struktur Data Riil) ──
+  // ── 🎯 FILTER RUGI PRESISI (Sesuai Skema Baku) ──
   const jumlahBarangRugi = useMemo(() => {
     return daftarBarang.filter((barang) => {
-      // 1. Ambil Modal Pcs Baku (skema baru: `modal`)
       const modalPcs = Number(barang.modal) || 0;
-
-      // 2. Ambil Harga Jual Eceran (skema baru: `jual`)
       const hargaJualEceran = Number(barang.jual) || 0;
 
-      // 🛡️ HANYA CEK RUGI ECERAN JIKA HARGA JUAL ECERAN DIISI (> 0)
       const isEceranRugi = (hargaJualEceran > 0 && modalPcs > 0) 
         ? hargaJualEceran < modalPcs 
         : false;
 
-      // 3. Ambil Logika Grosir (skema baru: `jualGrosirTotal`, `modalGrosirTotal`)
       const jualGrosir = Number(barang.jualGrosirTotal) || 0;
       const modalGrosir = Number(barang.modalGrosirTotal) || (modalPcs * (Number(barang.minimalBeliGrosir) || 1));
 
-      // 🛡️ HANYA CEK RUGI GROSIR JIKA HARGA JUAL GROSIR DIISI (> 0)
-      const isGrosirRugi = (jualGrosir > 0 && modalGrosir > 0) 
+      const isGrosirRugi = (Boolean(barang.bisaGrosir) && jualGrosir > 0 && modalGrosir > 0) 
         ? jualGrosir < modalGrosir 
         : false;
 
@@ -75,30 +69,25 @@ function BukuWarung() {
   // ── 🎯 MEMOIZE FILTER SEARCH & KATEGORI (SKEMA BAKU) ──
   const barangFiltered = useMemo(() => {
     return daftarBarang.filter((barang) => {
-      // 1. Filter Pencarian & Kategori
       const cocokSearch = (barang.nama || '').toLowerCase().includes(searchTerm.toLowerCase());
       const katBarang = (barang.kategori || 'item lain').trim();
       const cocokKategori = kategoriAktif === 'Semua' || katBarang.toLowerCase() === kategoriAktif.toLowerCase();
 
-      // 2. Pembacaan Variabel Baku (skema baru)
       const modalPcs = Number(barang.modal) || 0;
       const hargaJualPcs = Number(barang.jual) || 0;
       const jualGrosir = Number(barang.jualGrosirTotal) || 0;
       const modalGrosir = Number(barang.modalGrosirTotal) || 0;
 
-      // 3. Pengecekan Rugi Eceran (Hanya jika harga jual terisi)
       const isEceranRugi = (hargaJualPcs > 0 && modalPcs > 0) 
         ? hargaJualPcs < modalPcs 
         : false;
 
-      // 4. Pengecekan Rugi Grosir (Hanya jika fitur grosir aktif & ada harga jual grosir)
       const isGrosirRugi = (Boolean(barang.bisaGrosir) && jualGrosir > 0 && modalGrosir > 0) 
         ? jualGrosir < modalGrosir 
         : false;
 
       const apakahRugi = isEceranRugi || isGrosirRugi;
 
-      // 5. Hasil Filter
       if (filterRugiAktif) {
         return cocokSearch && cocokKategori && apakahRugi;
       }
@@ -161,7 +150,7 @@ function BukuWarung() {
       onMigrasiFirestore(result.data);
       setImportJsonText('');
       setIsImportModalOpen(false);
-      alert('✅ Berhasil impor data ke Firestore!');
+      alert('✅ Berhasil impor data!');
     } else {
       alert('❌ Fungsi migrasi data tidak tersedia di Context');
     }
@@ -229,17 +218,16 @@ function BukuWarung() {
           barangFiltered.map((barang) => {
             const isTerbuka = idCardTerbuka === barang.id;
             
-            const nameSatuanTerbesar = barang.satuanTerbesar || barang.satuanBeli || 'Dus';
+            const nameSatuanTerbesar = barang.satuanTerbesar || 'Dus';
             const hargaNotaTerbesar = Number(barang.hargaModalAgen) || 0;
-            const totalIsiPaket = Number(barang.isiKeEceran) || 0;
+            const modalPcs = Number(barang.modal) || 0;
             const hargaJualEceran = Number(barang.jual) || 0;
             const jualGrosir = Number(barang.jualGrosirTotal) || 0;
             const modalGrosir = Number(barang.modalGrosirTotal) || 0;
 
-            // ── 🎯 REAL-TIME MATH CORRECTION ──
-            const modalEceranRiil = (hargaNotaTerbesar > 0 && totalIsiPaket > 0) ? (hargaNotaTerbesar / totalIsiPaket) : 0;
-            const isEceranRugi = hargaJualEceran > 0 && hargaNotaTerbesar > 0 && totalIsiPaket > 0 ? hargaJualEceran < modalEceranRiil : false;
-            const isGrosirRugi = (Boolean(barang.bisaGrosir) && jualGrosir > 0 && modalGrosir > 0) ? jualGrosir < modalGrosir : false;
+            // ── 🎯 REAL-TIME MATH (BAKU) ──
+            const isEceranRugi = (hargaJualEceran > 0 && modalPcs > 0) ? (hargaJualEceran < modalPcs) : false;
+            const isGrosirRugi = (Boolean(barang.bisaGrosir) && jualGrosir > 0 && modalGrosir > 0) ? (jualGrosir < modalGrosir) : false;
             const apakahRugi = isEceranRugi || isGrosirRugi;
 
             return (
@@ -267,7 +255,7 @@ function BukuWarung() {
 
                   <div style={{ marginTop: '5px', fontSize: '0.75rem', fontWeight: '700', textAlign: 'left' }}>
                     {(() => {
-                      if (!hargaJualEceran || !hargaNotaTerbesar) {
+                      if (!hargaJualEceran || !modalPcs) {
                         return (
                           <span style={{ color: '#aeaeb2', backgroundColor: '#2c2c2e', padding: '4px 10px', borderRadius: '6px', display: 'inline-block', border: '1px solid #3a3a3c' }}>
                             ⚙️ Klik "Edit Data" Untuk Mengisi Harga
@@ -275,17 +263,16 @@ function BukuWarung() {
                         );
                       }
 
-                      const totalOmsetPerUnitBesar = hargaJualEceran * totalIsiPaket;
-                      const untungRupiahPerUnitBesar = totalOmsetPerUnitBesar - hargaNotaTerbesar;
-                      const persenMargin = totalOmsetPerUnitBesar > 0 ? ((untungRupiahPerUnitBesar / totalOmsetPerUnitBesar) * 100).toFixed(1) : 0;
+                      const untungPerPcs = hargaJualEceran - modalPcs;
+                      const persenMargin = hitungMarginCuan(modalPcs, hargaJualEceran);
 
-                      return untungRupiahPerUnitBesar >= 0 ? (
+                      return untungPerPcs >= 0 ? (
                         <span style={{ color: '#0a8168', backgroundColor: 'rgba(10, 129, 104, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                          📈 Margin Untung: {persenMargin}% (+Rp {untungRupiahPerUnitBesar.toLocaleString('id-ID')} / {nameSatuanTerbesar})
+                          📈 Margin Untung: {persenMargin}% (+Rp {untungPerPcs.toLocaleString('id-ID')} / {barang.satuanJual || 'Pcs'})
                         </span>
                       ) : (
                         <span style={{ color: '#ff3b30', backgroundColor: 'rgba(255, 59, 48, 0.08)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                          🛑 Jual Rugi: Selisih Rp {Math.abs(untungRupiahPerUnitBesar).toLocaleString('id-ID')}
+                          🛑 Jual Rugi: Selisih Rp {Math.abs(untungPerPcs).toLocaleString('id-ID')}
                         </span>
                       );
                     })()}
@@ -307,7 +294,7 @@ function BukuWarung() {
                       const marginGrosir = hitungMarginCuan(modalGrosir, jualGrosir);
                       return (
                         <div className={styles.detailRow}>
-                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir || 1} {barang.satuanJual || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {Number(barang.jualGrosirTotal).toLocaleString('id-ID')}</strong>
+                          <span className={styles.detailLabel}>🛒 Grosir ({barang.satuanGrosirNama || 'Renteng'}):</span> Beli min. {barang.minimalBeliGrosir || 1} {barang.satuanJual || 'Pcs'} → <strong style={{ color: isGrosirRugi ? '#ff3b30' : '#0a8168' }}>Rp {jualGrosir.toLocaleString('id-ID')}</strong>
                           {Number(marginGrosir) > 0 && <span style={{ color: '#0a8168', marginLeft: '6px', fontWeight: 'bold', fontSize: '0.78rem' }}>(Cuan Grosir: {marginGrosir}%)</span>}
                         </div>
                       );

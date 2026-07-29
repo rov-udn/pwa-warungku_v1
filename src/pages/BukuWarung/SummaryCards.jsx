@@ -5,24 +5,29 @@ import styles from './SummaryCards.module.css';
 import { useAppGudang } from '../../context/useAppGudang.jsx'; 
 
 function SummaryCards({ daftarBarang: propsDaftarBarang }) {
-  
   // Ambil data dari gudang pusat sebagai cadangan utama
   const { daftarBarang: contextDaftarBarang } = useAppGudang();
 
-  // ── 📊 HITUNG DATA RIIL WARUNG (LOGIKAL FILTER DIPINDAH KE DALAM USEMEMO) ──
+  // ── 📊 HITUNG DATA RIIL WARUNG ──
   const { totalModal, totalJenisBarang } = useMemo(() => {
-    // 🎯 AMAN: Menentukan sumber data di dalam useMemo agar tidak memicu re-render eksternal
     const dataMentah = propsDaftarBarang || contextDaftarBarang;
     const list = Array.isArray(dataMentah) ? dataMentah : [];
     
-    // Hitung total modal stok toko
-    const tm = list.reduce((sum, barang) => sum + (barang.modal || 0), 0);
+    // Hitung total modal stok toko (aman dari string/NaN)
+    const tm = list.reduce((sum, barang) => {
+      const modalUnit = Number(barang.modal) || 0;
+      // Jika ingin menghitung total modal x stok fisik, buka komentar baris di bawah:
+      // const jumlahStok = Number(barang.stok) || 0;
+      // return sum + (modalUnit * jumlahStok);
+      
+      return sum + modalUnit;
+    }, 0);
     
     // Hitung total varian/jenis barang
     const tj = list.length;
 
     return { totalModal: tm, totalJenisBarang: tj };
-  }, [propsDaftarBarang, contextDaftarBarang]); // 🎯 Dependency diubah ke props & context aslinya
+  }, [propsDaftarBarang, contextDaftarBarang]);
 
   return (
     <div className={styles.summaryGrid}>

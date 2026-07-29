@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db } from '../firebase.js'; 
+import { db, auth } from '../firebase.js'; 
 import { ref, set, onValue } from 'firebase/database';
-
-// 🎯 IMPOR MODUL AUTHENTICATION DARI FIREBASE
-import { auth } from '../firebase.js';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -50,7 +47,7 @@ const sanitizeBarang = (item) => {
   // 🎯 1. HARGA NOTA / MODAL AGEN (Satuan Terbesar)
   const hargaModalAgen = safeNumber(item.hargaModalAgen, 0);
 
-  // 🎯 2. ISI PCS DALAM PAKET/DUS (JANGAN PERNAH DEFAULT 40! Pakai fallback 1)
+  // 🎯 2. ISI PCS DALAM PAKET/DUS (Pakai fallback 1)
   const isiKeEceran = safeNumber(item.isiKeEceran, 1) || 1;
 
   // 🎯 3. HITUNG MODAL ECERAN RIIL PER PCS
@@ -70,7 +67,7 @@ const sanitizeBarang = (item) => {
     nama: safeString(item.nama, 'Tanpa Nama'),
     kategori: safeString(item.kategori, 'item lain'),
     
-    // Core Math Fields (Konsisten dengan BukuWarung.jsx)
+    // Core Math Fields
     hargaModalAgen: hargaModalAgen,
     modal: modalEceranRiil,
     jual: hargaJualEceran,
@@ -80,7 +77,7 @@ const sanitizeBarang = (item) => {
     satuanTerbesar: safeString(item.satuanTerbesar, 'Dus'),
     satuanJual: safeString(item.satuanJual, 'Pcs'),
 
-    // Fitur Grosir (Default Mati jika tidak diset)
+    // Fitur Grosir
     bisaGrosir: bisaGrosir,
     minimalBeliGrosir: safeNumber(item.minimalBeliGrosir, 0),
     satuanGrosirNama: safeString(item.satuanGrosirNama, 'Renteng'),
@@ -105,8 +102,8 @@ export function AppProvider({ children }) {
   const [isOnline, setIsOnline] = useState(getOnlineStatus());
 
   const [activePage, setActivePage] = useState(() => 
-  typeof window !== 'undefined' && window.innerWidth <= 768 ? 'dashboard' : 'buku-warung'
-);
+    typeof window !== 'undefined' && window.innerWidth <= 768 ? 'dashboard' : 'buku-warung'
+  );
 
   // Pantau perubahan jaringan internet secara real-time
   useEffect(() => {
@@ -131,9 +128,9 @@ export function AppProvider({ children }) {
   };
 
   // ── 📊 STATES GLOBAL ──
-  const [daftarBarang, setDaftarBarang] = useState(() => readStoredState(`${prefixPath}_daftar_barang`, []));
-  const [historyBelanja, setHistoryBelanja] = useState(() => readStoredState(`${prefixPath}_history_belanja`, []));
-  const [logPerubahanHarga, setLogPerubahanHarga] = useState(() => readStoredState(`${prefixPath}_log_perubahan_harga`, []));
+  const [daftarBarang, setDaftarBarang] = useState(() => readStoredState(STORAGE_KEYS.barang, []));
+  const [historyBelanja, setHistoryBelanja] = useState(() => readStoredState(STORAGE_KEYS.history, []));
+  const [logPerubahanHarga, setLogPerubahanHarga] = useState(() => readStoredState(STORAGE_KEYS.logHarga, []));
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
 
   // ── 🔄 DETEKSI REALTIME STATUS LOGIN EMAIL (FIREBASE AUTH WATCHER) ──
@@ -162,7 +159,7 @@ export function AppProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // ── 🔑 MULTI-USER CLOUD ACTIONS (DAFTAR & LOGIN EMAIL RESMI) ──
+  // ── 🔑 MULTI-USER CLOUD ACTIONS ──
   const handleDaftarWarungBaru = useCallback(async (email, password, namaPemilik, namaWarungBaru) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -188,13 +185,10 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // 🎯 2. UPDATE FUNGSI LOGIN BIAR LANGSUNG PINDAHIN HALAMAN
   const handleLoginEmail = useCallback(async (email, password) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       alert("🔓 Login Sukses! Data warung Anda otomatis disinkronkan.");
-      
-      // Pas diklik OK, langsung eksekusi ganti halaman di tempat!
       setActivePage('dashboard'); 
     } catch (error) {
       console.error(error);
@@ -227,23 +221,22 @@ export function AppProvider({ children }) {
     }
   }, [userWarung, prefixPath]);
 
-  // ── 🔄 REALTIME FIREBASE SYNC (LURUS SEARAH DENGAN PERSISTANDSYNC) ──
+  // ── 🔄 REALTIME FIREBASE SYNC ──
   useEffect(() => {
     if (!isOnline || !userWarung) return;
 
     const subscribeToPath = (path, key, setter) => onValue(ref(db, `users/${userWarung.idWarung}/${path}`), (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Validasi ketat: Hanya update state jika data dari cloud berbeda dengan data lokal berjalan
+        const parsedData = Array.isArray(data) ? data : Object.values(data);
         setter((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
-          return data;
+          if (JSON.stringify(prev) === JSON.stringify(parsedData)) return prev;
+          return parsedData;
         });
-        localStorage.setItem(key, JSON.stringify(data));
+        localStorage.setItem(key, JSON.stringify(parsedData));
       }
     });
 
-    // 🎯 FIX SINKRONISASI: Menghapus string kata kunci yang salah tumpuk
     const unsubBarang = subscribeToPath('daftar_barang', STORAGE_KEYS.barang, setDaftarBarang);
     const unsubHistory = subscribeToPath('history_belanja', STORAGE_KEYS.history, setHistoryBelanja);
     const unsubLog = subscribeToPath('log_perubahan_harga', STORAGE_KEYS.logHarga, setLogPerubahanHarga);
@@ -272,19 +265,18 @@ export function AppProvider({ children }) {
 
   // ── ⚙️ FUNGSI MUTASI UTAMA TOKO ──
   const handleTambahBarang = useCallback((barangBaru) => {
-  setDaftarBarang((prevBarang) => {
-    // 🎯 Lewatkan ke sanitizeBarang agar variabel isiGrosirBesar & jualGrosirBesar PASTI ADA
-    const barangBersih = sanitizeBarang({ ...barangBaru, id: Date.now() });
-    const updateData = [...prevBarang, barangBersih];
-    persistAndSync(STORAGE_KEYS.barang, updateData);
-    return updateData;
-  });
-}, [persistAndSync, STORAGE_KEYS.barang]);
+    setDaftarBarang((prevBarang) => {
+      const barangBersih = sanitizeBarang({ ...barangBaru, id: Date.now() });
+      const updateData = [...prevBarang, barangBersih];
+      persistAndSync(STORAGE_KEYS.barang, updateData);
+      return updateData;
+    });
+  }, [persistAndSync, STORAGE_KEYS.barang]);
 
   const handleEditBarang = useCallback((id, dataDiperbarui) => {
     setDaftarBarang((prevBarang) => {
       const updateData = prevBarang.map((barang) =>
-        barang.id === id ? { ...barang, ...dataDiperbarui } : barang
+        String(barang.id) === String(id) ? sanitizeBarang({ ...barang, ...dataDiperbarui }) : barang
       );
       persistAndSync(STORAGE_KEYS.barang, updateData);
       return updateData;
@@ -295,7 +287,7 @@ export function AppProvider({ children }) {
     const namaPanggilan = userWarung ? userWarung.pemilik : 'Bos';
     if (window.confirm(`Yakin mau hapus barang ini dari toko, ${namaPanggilan}?`)) {
       setDaftarBarang((prevBarang) => {
-        const updateData = prevBarang.filter((barang) => barang.id !== id);
+        const updateData = prevBarang.filter((barang) => String(barang.id) !== String(id));
         persistAndSync(STORAGE_KEYS.barang, updateData);
         return updateData;
       });
@@ -308,30 +300,30 @@ export function AppProvider({ children }) {
 
     setDaftarBarang((prevBarang) => {
       daftarBarangTerupdate = prevBarang.map((barang) => {
-        if (barang.id === idBarang) {
+        if (String(barang.id) === String(idBarang)) {
           let modalEceranTerkecil;
           if (['Dus', 'Karton', 'Bal'].includes(satuanBeliAgen)) {
-            const isiPerDus = Number(barang.minimalBeliGrosirBesar) || 40;
+            const isiPerDus = Number(barang.isiKeEceran) || 1;
             modalEceranTerkecil = perPieceFromTotal(hargaModalBaru, isiPerDus);
           } else if (['Renteng', 'Pack', 'Slop'].includes(satuanBeliAgen)) {
-            const isiPerRenteng = Number(barang.minimalBeliGrosir) || 10;
+            const isiPerRenteng = Number(barang.minimalBeliGrosir) || 1;
             modalEceranTerkecil = perPieceFromTotal(hargaModalBaru, isiPerRenteng);
           } else {
             modalEceranTerkecil = Math.ceil(Number(hargaModalBaru) || 0);
           }
 
           const modalLamaUntukLog = prevModal !== null ? Number(prevModal) : (barang.modal || 0);
-          // 🎯 PASTIKAN LOG HANYA MENCATAT HASIL PERHITUNGAN ECERAN TERKECIL
+
           if (modalLamaUntukLog > 0 && modalEceranTerkecil > 0 && modalLamaUntukLog !== modalEceranTerkecil) {
             logBaruBaru = {
-              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
               tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
               namaBarang: barang.nama,
-              modalLama: Number(modalLamaUntukLog),   // Eceran Lama
-              modalBaru: Number(modalEceranTerkecil)  // Eceran Baru (Hasil bagi per-piece)
+              modalLama: Number(modalLamaUntukLog),
+              modalBaru: Number(modalEceranTerkecil)
             };
           }
-          return { ...barang, modal: modalEceranTerkecil };
+          return sanitizeBarang({ ...barang, modal: modalEceranTerkecil, hargaModalAgen: Number(hargaModalBaru) || 0 });
         }
         return barang;
       });
@@ -352,7 +344,7 @@ export function AppProvider({ children }) {
   const addLogPerubahanHarga = useCallback(({ namaBarang, modalLama, modalBaru }) => {
     if (modalLama === modalBaru) return;
     const entry = {
-      idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      idLog: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
       namaBarang: namaBarang || 'Unknown',
       modalLama: Number(modalLama) || 0,
@@ -365,7 +357,7 @@ export function AppProvider({ children }) {
     });
   }, [persistAndSync, STORAGE_KEYS.logHarga]);
 
-  // ── ⚙️ FIX: FUNGSI KOREKSI NOTA BATCH SYNC SAFE ──
+  // ── ⚙️ FUNGSI KOREKSI NOTA BATCH SYNC SAFE ──
   const handleKoreksiNota = useCallback((idNota, itemsDiperbarui, totalPengeluaranBaru) => {
     let logAntreanBaru = [];
     let barangTerupdate = [];
@@ -374,34 +366,30 @@ export function AppProvider({ children }) {
     // 1. Hitung Update Barang
     setDaftarBarang((prevBarang) => {
       barangTerupdate = prevBarang.map((barang) => {
-        // 🎯 FIX 1: Cocokkan ID sebagai String (atau nama barang jika ID beda format)
         const itemKoreksi = itemsDiperbarui.find((item) => 
           String(item.id) === String(barang.id) || 
           (item.nama && barang.nama && item.nama.toLowerCase().trim() === barang.nama.toLowerCase().trim())
         );
 
         if (itemKoreksi) {
-          // 1. Ambil modal eceran yang SUDAH BERHASIL DIHITUNG oleh ModalBarang.jsx
           const modalEceranBaru = Number(
             itemKoreksi.modalEceranTerhitung ?? 
             itemKoreksi.modal ?? 
             0
           );
 
-          // 2. Ambil harga total nota agen
           const hargaNotaAgenBaru = Number(
-            itemKoreksi.hargaModalAgen ?? 
             itemKoreksi.modalBaru ?? 
+            itemKoreksi.hargaModalAgen ?? 
             barang.hargaModalAgen ?? 
             0
           );
 
           const modalEceranLama = Number(barang.modal) || 0;
 
-          // 3. 🎯 LOG HANYA MEMBANDINGKAN ECERAN LAMA (Rp 24.900) VS ECERAN BARU (Rp 24.900)
           if (modalEceranLama > 0 && modalEceranBaru > 0 && modalEceranLama !== modalEceranBaru) {
             logAntreanBaru.push({
-              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              idLog: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
               tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
               namaBarang: barang.nama,
               modalLama: modalEceranLama,
@@ -412,9 +400,7 @@ export function AppProvider({ children }) {
           return sanitizeBarang({
             ...barang,
             modal: modalEceranBaru,
-            hargaModalAgen: hargaNotaAgenBaru,
-            modalGrosirTotal: itemKoreksi.modalGrosirTotal || barang.modalGrosirTotal,
-            jualGrosirBesarTotal: hargaNotaAgenBaru
+            hargaModalAgen: hargaNotaAgenBaru
           });
         }
         return barang;
@@ -460,13 +446,13 @@ export function AppProvider({ children }) {
         day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
       }),
       items: keranjangData,
-      totalPengeluarannya: keranjangData.reduce((sum, item) => sum + (item.modalBaru * item.qty), 0)
+      totalPengeluarannya: keranjangData.reduce((sum, item) => sum + ((Number(item.modalBaru) || 0) * (Number(item.qty) || 1)), 0)
     };
     setHistoryBelanja((prevHistory) => {
       const historyTerbaru = [notaBaru, ...prevHistory];
       const batasWaktu = Date.now() - (15 * 24 * 60 * 60 * 1000);
       const historyFiltered = historyTerbaru.filter((nota) => {
-        const idTimestamp = Number(nota.id.split('-')[1]);
+        const idTimestamp = Number(String(nota.id).split('-')[1]);
         return idTimestamp > batasWaktu;
       });
       persistAndSync(STORAGE_KEYS.history, historyFiltered);
@@ -481,114 +467,58 @@ export function AppProvider({ children }) {
         return;
       }
 
-      const dataHasilKonversi = dataFirestoreLama.map((itemLama) => {
-        // 🎯 LANGSUNG AMBIL DATA MURNI DARI JSON BOS (Tanpa tebak-tebakan rumus)
-        const modalEceranMurni = Number(itemLama.modal) || Number(itemLama.modalEceran) || 0;
-        const hargaModalAgenMurni = Number(itemLama.hargaModalAgen) || Number(itemLama.hargaAgen) || 0;
-        const hargaJualMurni = Number(itemLama.jual) || Number(itemLama.hargaEceran) || 0;
-
-        return {
-          id: itemLama.id || `BARANG-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          nama: itemLama.nama || 'Tanpa Nama',
-          modal: modalEceranMurni, // Rp 14.600
-          hargaModalAgen: hargaModalAgenMurni, // Rp 146.000
-          jual: hargaJualMurni, // Rp 16.000
-          satuanModal: itemLama.satuanModal || itemLama.satuanBeli || 'Slop',
-          satuanJual: itemLama.satuanJual || 'Bungkus',
-          isiGrosirBesar: Number(itemLama.isiGrosirBesar) || 40,
-          varian: Array.isArray(itemLama.varian) ? itemLama.varian : [],
-          bisaGrosir: itemLama.bisaGrosir !== undefined ? itemLama.bisaGrosir : true,
-          minimalBeliGrosir: Number(itemLama.minimalBeliGrosir) || 1,
-          satuanGrosirNama: itemLama.satuanGrosirNama || 'Bungkus',
-          jualGrosir: Number(itemLama.jualGrosir) || hargaJualMurni,
-          bisaGrosirBesar: itemLama.bisaGrosirBesar !== undefined ? itemLama.bisaGrosirBesar : false,
-          minimalBeliGrosirBesar: Number(itemLama.minimalBeliGrosirBesar) || 40,
-          satuanGrosirBesarNama: itemLama.satuanGrosirBesarNama || 'Slop',
-          jualGrosirBesarTotal: Number(itemLama.jualGrosirBesarTotal) || hargaModalAgenMurni,
-          jualGrosirBesarPerPcs: Number(itemLama.jualGrosirBesarPerPcs) || 0,
-          catatan: itemLama.catatan || '',
-          stok: Number(itemLama.stok) || 0,
-          kategori: itemLama.kategori || 'Rokok/Korek'
-        };
-      });
-
-      // Urutkan berdasarkan Abjad nama barang
+      const dataHasilKonversi = dataFirestoreLama.map((itemLama) => sanitizeBarang(itemLama));
       const dataSudahUrutAZ = dataHasilKonversi.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
       
-      // 1. Update State aplikasi secara real-time
       setDaftarBarang(dataSudahUrutAZ);
+      persistAndSync(STORAGE_KEYS.barang, dataSudahUrutAZ);
 
-      // 2. Bungkus ke format Firebase Object Map
-      const paketUpdateFirebase = {};
-      dataSudahUrutAZ.forEach((barang) => {
-        paketUpdateFirebase[barang.id] = barang;
-      });
-
-      // 3. 🎯 TEMBAK KE LACI YANG BENAR: menggunakan idWarung dan folder daftar_barang
-      const targetBarangRef = ref(db, `users/${userWarung.idWarung}/daftar_barang`);
-      
-      // Kirim data ke Cloud Firebase
-      await set(targetBarangRef, dataSudahUrutAZ);
-
-      // 4. Backup aman di LocalStorage laptop
-      localStorage.setItem(STORAGE_KEYS.barang, JSON.stringify(dataSudahUrutAZ));
-
-      alert(`✅ Sukses, Bos! ${dataSudahUrutAZ.length} data barang berhasil masuk dengan harga modal & jual yang pas 100%!`);
+      alert(`✅ Sukses, Bos! ${dataSudahUrutAZ.length} data barang berhasil diimpor & disinkronkan!`);
     } catch (error) {
       console.error(error);
       alert("❌ Gagal total pas konversi data: " + error.message);
     }
-  }, [STORAGE_KEYS.barang, userWarung]);
+  }, [STORAGE_KEYS.barang, userWarung, persistAndSync]);
 
-  // ── 🛡️ SAFE IMPORT: Terima array barang (sudah ditransform) dan simpan dengan aman
   const handleImportDaftarBarang = useCallback((dataArray) => {
-  try {
-    if (!Array.isArray(dataArray)) return { success: false, message: 'Input harus berupa array' };
-    
-    // 🎯 Bersihkan setiap item impor dengan skema lengkap
-    const dataCleaned = dataArray.map(item => sanitizeBarang(item));
-    const dataSudahUrut = dataCleaned.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
-    
-    setDaftarBarang(dataSudahUrut);
-    persistAndSync(STORAGE_KEYS.barang, dataSudahUrut);
-    return { success: true, count: dataSudahUrut.length };
-  } catch (err) {
-    console.error('Import gagal', err);
-    return { success: false, error: err.message };
-  }
-}, [persistAndSync, STORAGE_KEYS.barang]);
-
-// 🧹 FUNGSI PEMBERSIH AMAN
-const handleBersihkanDataDatabase = useCallback(() => {
-  if (!userWarung) {
-    alert("❌ Kamu harus login dulu, Bos!");
-    return;
-  }
-
-  const konfirmasi = window.confirm("⚠️ Rapikan & bersihkan seluruh database?");
-  if (!konfirmasi) return;
-
-  try {
-    setDaftarBarang((prevBarang) => {
-      // 🛡️ GARANSI ARRAY: Antisipasi jika prevBarang bukan array murni
-      const listBarang = Array.isArray(prevBarang) 
-        ? prevBarang 
-        : Object.values(prevBarang || {});
-
-      // 🧹 Clean up dengan sanitizeBarang versi presisi
-      const dataBersih = listBarang.map((barang) => sanitizeBarang(barang));
+    try {
+      if (!Array.isArray(dataArray)) return { success: false, message: 'Input harus berupa array' };
       
-      // 💾 Menimpa total LocalStorage & Firebase RTDB
-      persistAndSync(STORAGE_KEYS.barang, dataBersih);
+      const dataCleaned = dataArray.map(item => sanitizeBarang(item));
+      const dataSudahUrut = dataCleaned.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
       
-      alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} barang berhasil dirapikan!`);
-      return dataBersih;
-    });
-  } catch (error) {
-    console.error("Gagal membersihkan data:", error);
-    alert("❌ Gagal merapikan database: " + error.message);
-  }
-}, [userWarung, persistAndSync, STORAGE_KEYS.barang]);
+      setDaftarBarang(dataSudahUrut);
+      persistAndSync(STORAGE_KEYS.barang, dataSudahUrut);
+      return { success: true, count: dataSudahUrut.length };
+    } catch (err) {
+      console.error('Import gagal', err);
+      return { success: false, error: err.message };
+    }
+  }, [persistAndSync, STORAGE_KEYS.barang]);
+
+  const handleBersihkanDataDatabase = useCallback(() => {
+    if (!userWarung) {
+      alert("❌ Kamu harus login dulu, Bos!");
+      return;
+    }
+
+    const konfirmasi = window.confirm("⚠️ Rapikan & bersihkan seluruh database?");
+    if (!konfirmasi) return;
+
+    try {
+      setDaftarBarang((prevBarang) => {
+        const listBarang = Array.isArray(prevBarang) ? prevBarang : Object.values(prevBarang || {});
+        const dataBersih = listBarang.map((barang) => sanitizeBarang(barang));
+        
+        persistAndSync(STORAGE_KEYS.barang, dataBersih);
+        alert(`🎉 SUKSES! Sebanyak ${dataBersih.length} barang berhasil dirapikan!`);
+        return dataBersih;
+      });
+    } catch (error) {
+      console.error("Gagal membersihkan data:", error);
+      alert("❌ Gagal merapikan database: " + error.message);
+    }
+  }, [userWarung, persistAndSync, STORAGE_KEYS.barang]);
 
   return (
     <AppContext.Provider value={{
