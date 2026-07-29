@@ -16,20 +16,20 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   // ── 📥 2. RANTAI SATUAN & KONVERSI (DILENGKAPI FALLBACK KEY FIREBASE) ──
   const [satuanTerbesar, setSatuanTerbesar] = useState(
-    isEdit ? (barangAktif.satuanTerbesar || barangAktif.satuanBeli || barangAktif.satuanModal || 'Dus') : 'Dus'
+    isEdit ? (barangAktif.satuanTerbesar || 'Dus') : 'Dus'
   );
 
   const [hargaModalAgen, setHargaModalAgen] = useState(
-    isEdit ? (barangAktif.hargaModalAgen || barangAktif.hargaAgen || barangAktif.modalBaru || '') : ''
+    isEdit ? (barangAktif.hargaModalAgen || '') : ''
   );
 
   // 🎯 FIX TERPENTING: Jangan default ke '40'! Cari semua variabel isi di Firebase
   const [isiKeEceran, setIsiKeEceran] = useState(
-    isEdit ? (barangAktif.isiKeEceran || barangAktif.isiSatuan || barangAktif.isiPerSatuan || '1') : '1'
+    isEdit ? (barangAktif.isiKeEceran || '1') : '1'
   );
 
   const [satuanEceran, setSatuanEceran] = useState(
-    isEdit ? (barangAktif.satuanJual || barangAktif.satuanEceran || barangAktif.satuan || 'Pcs') : 'Pcs'
+    isEdit ? (barangAktif.satuanJual || 'Pcs') : 'Pcs'
   );
 
   const [jumlahKonversiGrosir, setJumlahKonversiGrosir] = useState(
@@ -42,11 +42,11 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
   // ── 📤 3. BLOK HARGA JUAL KASIR ──
   const [jualEceran, setJualEceran] = useState(
-    isEdit ? (barangAktif.jual || barangAktif.hargaEceran || '') : ''
+    isEdit ? (barangAktif.jual || '') : ''
   );
 
   const [jualGrosirTotal, setJualGrosirTotal] = useState(
-    isEdit ? (barangAktif.jualGrosirTotal || barangAktif.jualGrosir || '') : ''
+    isEdit ? (barangAktif.jualGrosirTotal || '') : ''
   );
 
   const daftarKategori = [
@@ -109,9 +109,6 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
 
       // 1. Konversi Isi (Disamakan semua biar tidak bentrok 40 vs 120!)
       isiKeEceran: totalIsiTerkecil,
-      isiSatuan: totalIsiTerkecil,
-      isiPerSatuan: totalIsiTerkecil,
-      isiGrosirBesar: totalIsiTerkecil,
 
       // 2. Satuan
       satuanTerbesar,
@@ -119,17 +116,12 @@ function ModalBarang({ isOpen, onClose, modalMode, barangAktif, onSimpan }) {
       satuanModal: satuanTerbesar,
       satuanJual: satuanEceran,
 
-      // 3. Modal & Agen (Ganti empty string '' dengan angka 0)
+      // 3. Modal & Agen
       hargaModalAgen: hargaNota,
-      hargaAgen: hargaNota,
-      modalBaru: hargaNota,
       modal: modalEceranTerkecil,
-      modalEceran: modalEceranTerkecil,
-      modalEceranTerhitung: modalEceranTerkecil,
 
       // 4. Kasir & Harga Jual
       jual: valJualEceran,
-      hargaEceran: valJualEceran,
       jualGrosirTotal: valJualGrosirTotal,
       jualGrosir: valJualGrosirPerPcs,
 

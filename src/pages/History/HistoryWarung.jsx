@@ -57,15 +57,14 @@ function HistoryWarung() {
       const satuanNotaKecil = (item.satuanModal || '').toLowerCase();
       
       if (!['pcs', 'bungkus', 'bks', 'eceran'].includes(satuanNotaKecil) && barangAsli) {
-        // 🎯 FIX: Sertakan seluruh alternatif key isi barang dari ModalBarang & BukuWarung
-        isiPembagi = Number(barangAsli.isiKeEceran || barangAsli.isiSatuan || barangAsli.isiPerSatuan || barangAsli.jumlahIsi) || 1;
+        isiPembagi = Number(barangAsli.isiKeEceran) || 1;
       }
 
       const stableIdUnik = item.idUnik || `item-${nota.id}-${idx}`;
       return {
         ...item,
         idUnik: stableIdUnik,
-        modalBaru: item.modalBaru ?? item.hargaModalAgen ?? item.hargaModal ?? 0,
+        modalBaru: Number(item.modalBaru) || 0,
         isiKeEceran: isiPembagi
       };
     });
@@ -248,7 +247,7 @@ function HistoryWarung() {
                         {item.nama} <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>({item.qty} {item.satuanModal})</span>
                       </span>
                       <span style={{ fontWeight: '600' }}>
-                        Rp {(item.qty * (item.modalBaru ?? item.hargaModalAgen ?? item.hargaModal ?? 0)).toLocaleString('id-ID')}
+                        Rp {(item.qty * (Number(item.modalBaru) || 0)).toLocaleString('id-ID')}
                       </span>
                     </div>
                   ))}
@@ -257,7 +256,7 @@ function HistoryWarung() {
                 <div className={styles.totalRow} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
                   <span style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>Total Pengeluaran:</span>
                   {/* 🎯 TOTAL PENGELUARAN CYAN NEON */}
-                  <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(nota.totalPengeluarannya || nota.items?.reduce((s,i)=>s+(i.qty*(i.modalBaru ?? i.hargaModalAgen ?? i.hargaModal ?? 0)),0) || 0).toLocaleString('id-ID')}</span>
+                  <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(nota.totalPengeluarannya || nota.items?.reduce((s,i)=>s+(i.qty*(Number(i.modalBaru) || 0)),0) || 0).toLocaleString('id-ID')}</span>
                 </div>
               </div>
             ))
@@ -285,14 +284,14 @@ function HistoryWarung() {
                   <strong style={{ display: 'block', color: 'var(--text-main)' }}>{item.nama}</strong>
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{item.qty} {item.satuanModal || 'pcs'}</span>
                 </div>
-                <span style={{ fontWeight: '700' }}>Rp {(item.qty * (item.modalBaru ?? item.hargaModalAgen ?? item.hargaModal ?? 0)).toLocaleString('id-ID')}</span>
+                <span style={{ fontWeight: '700' }}>Rp {(item.qty * (Number(item.modalBaru) || 0)).toLocaleString('id-ID')}</span>
               </div>
             ))}
           </div>
 
           <div className={styles.totalRow} style={{ justifyContent: 'space-between', paddingTop: '12px' }}>
             <span style={{ color: 'var(--text-main)', fontSize: '0.88rem' }}>Total Pengeluaran:</span>
-            <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(selectedNota.totalPengeluarannya || selectedNota.items?.reduce((s,i)=>s+(i.qty*(i.modalBaru ?? i.hargaModalAgen ?? i.hargaModal ?? 0)),0) || 0).toLocaleString('id-ID')}</span>
+            <span style={{ color: 'var(--accent-cyan)', fontSize: '1rem', fontWeight: '800' }}>Rp {(selectedNota.totalPengeluarannya || selectedNota.items?.reduce((s,i)=>s+(i.qty*(Number(i.modalBaru) || 0)),0) || 0).toLocaleString('id-ID')}</span>
           </div>
         </div>
       )}

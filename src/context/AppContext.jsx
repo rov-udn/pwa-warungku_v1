@@ -48,32 +48,26 @@ const sanitizeBarang = (item) => {
   };
 
   // 🎯 1. HARGA NOTA / MODAL AGEN (Satuan Terbesar)
-  const hargaModalAgen = safeNumber(
-    item.hargaModalAgen ?? item.hargaAgen ?? item.modalBaru ?? item.modalAgen,
-    0
-  );
+  const hargaModalAgen = safeNumber(item.hargaModalAgen, 0);
 
   // 🎯 2. ISI PCS DALAM PAKET/DUS (JANGAN PERNAH DEFAULT 40! Pakai fallback 1)
-  const isiKeEceran = safeNumber(
-    item.isiKeEceran ?? item.isiGrosirBesar ?? item.isiPerSatuan ?? item.isiSatuan ?? item.jumlahIsi,
-    1
-  ) || 1;
+  const isiKeEceran = safeNumber(item.isiKeEceran, 1) || 1;
 
   // 🎯 3. HITUNG MODAL ECERAN RIIL PER PCS
   const modalEceranRiil = hargaModalAgen > 0 && isiKeEceran > 0
     ? Math.ceil(hargaModalAgen / isiKeEceran)
-    : safeNumber(item.modal ?? item.modalEceran, 0);
+    : safeNumber(item.modal, 0);
 
   // 🎯 4. HARGA JUAL ECERAN & GROSIR
-  const hargaJualEceran = safeNumber(item.jual ?? item.hargaEceran ?? item.jualEceran, 0);
+  const hargaJualEceran = safeNumber(item.jual, 0);
   const bisaGrosir = item.bisaGrosir !== undefined ? Boolean(item.bisaGrosir) : false;
-  const jualGrosirTotal = safeNumber(item.jualGrosirTotal ?? item.jualGrosir, 0);
-  const modalGrosirTotal = safeNumber(item.modalGrosirTotal ?? hargaModalAgen, 0);
+  const jualGrosirTotal = safeNumber(item.jualGrosirTotal, 0);
+  const modalGrosirTotal = safeNumber(item.modalGrosirTotal, 0);
 
   // 🎯 5. KEMBALIKAN SKEMA CLEAN & UNIFORM
   return {
     id: item.id || `BARANG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    nama: safeString(item.nama || item.namaBarang, 'Tanpa Nama'),
+    nama: safeString(item.nama, 'Tanpa Nama'),
     kategori: safeString(item.kategori, 'item lain'),
     
     // Core Math Fields (Konsisten dengan BukuWarung.jsx)
@@ -83,12 +77,12 @@ const sanitizeBarang = (item) => {
     isiKeEceran: isiKeEceran,
 
     // Satuan
-    satuanTerbesar: safeString(item.satuanTerbesar || item.satuanModal || item.satuanBeli, 'Dus'),
+    satuanTerbesar: safeString(item.satuanTerbesar, 'Dus'),
     satuanJual: safeString(item.satuanJual, 'Pcs'),
 
     // Fitur Grosir (Default Mati jika tidak diset)
     bisaGrosir: bisaGrosir,
-    minimalBeliGrosir: safeNumber(item.minimalBeliGrosir ?? item.minGrosir, 0),
+    minimalBeliGrosir: safeNumber(item.minimalBeliGrosir, 0),
     satuanGrosirNama: safeString(item.satuanGrosirNama, 'Renteng'),
     jualGrosirTotal: jualGrosirTotal,
     modalGrosirTotal: modalGrosirTotal,
@@ -390,7 +384,6 @@ export function AppProvider({ children }) {
           // 1. Ambil modal eceran yang SUDAH BERHASIL DIHITUNG oleh ModalBarang.jsx
           const modalEceranBaru = Number(
             itemKoreksi.modalEceranTerhitung ?? 
-            itemKoreksi.modalEceran ?? 
             itemKoreksi.modal ?? 
             0
           );

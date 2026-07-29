@@ -63,11 +63,9 @@ function BelanjaAgen() {
     setVarianTerpilih(barang.varian && barang.varian.length > 0 ? barang.varian[0] : ''); 
     setQtyInput(1);
 
-    // 🎯 SINKRONISASI HARGA MODAL DENGAN FALLBACK LENGKAP
-    const satuanDefault = barang.satuanBeli || barang.satuanModal || 'Dus';
-    const hargaDefault = (barang.hargaModalAgen !== undefined && barang.hargaModalAgen !== '')
-      ? barang.hargaModalAgen 
-      : (barang.hargaAgen || barang.modalGrosirTotal || 0);
+    // 🎯 SINKRONISASI HARGA MODAL DENGAN SKEMA BAKU
+    const satuanDefault = barang.satuanTerbesar || 'Dus';
+    const hargaDefault = Number(barang.hargaModalAgen) || 0;
 
     setSatuanTerpilih(satuanDefault);
     setInputHargaModal(hargaDefault);
@@ -78,9 +76,7 @@ function BelanjaAgen() {
     if (!barangTerpilih) return;
 
     const hargaModalFinal = Number(inputHargaModal) || 0;
-    const hargaPembanding = (barangTerpilih.hargaModalAgen !== undefined && barangTerpilih.hargaModalAgen !== '')
-      ? barangTerpilih.hargaModalAgen
-      : (barangTerpilih.hargaAgen || 0);
+    const hargaPembanding = Number(barangTerpilih.hargaModalAgen) || 0;
     
     if (typeof onUpdateHargaModal === 'function' && hargaModalFinal !== hargaPembanding) {
       onUpdateHargaModal(barangTerpilih.id, hargaModalFinal, satuanTerpilih);
@@ -247,15 +243,13 @@ function BelanjaAgen() {
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Barang tidak ditemukan, {userWarung ? userWarung.pemilik : 'Bos'}. 🧐</div>
             ) : (
               barangFiltered.map((barang) => {
-                const modalTerupdate = (barang.hargaModalAgen !== undefined && barang.hargaModalAgen !== '') 
-                  ? barang.hargaModalAgen 
-                  : (barang.hargaAgen || 0);
+                const modalTerupdate = Number(barang.hargaModalAgen) || 0;
 
                 return (
                   <div key={barang.id} onClick={() => handleKlikTambah(barang)} className={styles.cardPilihItem}>
                     <div className={styles.infoKiri}>
                       <h4>{barang.nama}</h4>
-                      <span>M: Rp {modalTerupdate.toLocaleString('id-ID')} / {barang.satuanBeli || barang.satuanModal || 'Dus'}</span>
+                      <span>M: Rp {modalTerupdate.toLocaleString('id-ID')} / {barang.satuanTerbesar || 'Dus'}</span>
                     </div>
                     <div className={styles.indicatorPilih}>
                       + Keranjang
@@ -368,10 +362,8 @@ function BelanjaAgen() {
               {(() => {
                 const options = [];
                 
-                const unitBesar = barangTerpilih.satuanBeli || barangTerpilih.satuanModal || 'Dus';
-                const hargaTerupdateBesar = (barangTerpilih.hargaModalAgen !== undefined && barangTerpilih.hargaModalAgen !== '') 
-                  ? barangTerpilih.hargaModalAgen 
-                  : (barangTerpilih.hargaAgen || 0);
+                const unitBesar = barangTerpilih.satuanTerbesar || 'Dus';
+                const hargaTerupdateBesar = Number(barangTerpilih.hargaModalAgen) || 0;
 
                 options.push({
                   type: 'tanggaAtas',
